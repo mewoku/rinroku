@@ -1,0 +1,8 @@
+{
+  "name": "Ronriku.PlayModeTests",
+  "rootNamespace": "Ronriku.Tests",
+  "references": ["Ronriku.Runtime"],
+  "optionalUnityReferences": ["TestAssemblies"],
+  "autoReferenced": false
+}
+

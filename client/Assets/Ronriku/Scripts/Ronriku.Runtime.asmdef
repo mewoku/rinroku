@@ -1,0 +1,8 @@
+{
+  "name": "Ronriku.Runtime",
+  "rootNamespace": "Ronriku",
+  "references": [],
+  "autoReferenced": true,
+  "noEngineReferences": false
+}
+

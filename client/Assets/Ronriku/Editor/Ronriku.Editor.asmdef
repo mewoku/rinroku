@@ -1,0 +1,8 @@
+{
+  "name": "Ronriku.Editor",
+  "rootNamespace": "Ronriku.Editor",
+  "references": ["Ronriku.Runtime"],
+  "includePlatforms": ["Editor"],
+  "autoReferenced": true
+}
+

@@ -424,22 +424,4 @@ namespace Ronriku.Domain.Puzzles
             return remaining.Count == 0;
         }
     }
-
-    internal struct DeterministicRandom
-    {
-        private ulong _state;
-
-        public DeterministicRandom(ulong seed) => _state = seed == 0 ? 0x9E3779B97F4A7C15UL : seed;
-
-        public int NextInt(int exclusiveMax)
-        {
-            if (exclusiveMax <= 0) throw new ArgumentOutOfRangeException(nameof(exclusiveMax));
-            ulong value = _state;
-            value ^= value >> 12;
-            value ^= value << 25;
-            value ^= value >> 27;
-            _state = value;
-            return (int)((value * 2685821657736338717UL) % (ulong)exclusiveMax);
-        }
-    }
 }

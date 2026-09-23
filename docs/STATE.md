@@ -38,6 +38,7 @@ Verification (2026-09-23)
 - EditMode: 7/7 passed — group closure, in-box rotation, determinism (1,500 seed×difficulty cases), invariants (1,500 cases: connected, in-box, unsolved start, solver par == stored par within difficulty range, validator accepts solver path, ≤4 matching orientations), variety, validator rejection cases, scorer.
 - PlayMode: 2/2 passed — Home → Spatial route; solver path clicked through real buttons reveals CONTINUE and returns Home.
 - Capture: `docs/evidence/{narrow-16x9,seeker-20x9,tall-22x9}-{1-home,2-spatial-start,3-spatial-move,4-spatial-solved}.png` rendered offscreen in batchmode and inspected.
+- Android build: passed 2026-09-23, `Builds/Android/RONRIKU.apk` 42,169,768 bytes, SHA-256 `cecf2a3da52a14bfc0f1ec1ff1cbb1693226c26d42ee7e784fab4a562c39eb02`. `RonrikuBuild.Verify` ran the same 1,500-case invariant sweep.
 - Not verified: physical device install/launch, touch swipe feel, haptic feel, FPS. No AVD or device is attached (`adb devices` empty, `~/.android/avd` empty).
 
 Known gaps

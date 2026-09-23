@@ -63,7 +63,9 @@ Verification (2026-09-24, in the open editor via Unity CLI Pipeline)
 - EditMode 17/17; PlayMode 2/2 (full Daily from fresh profile on a fixed date → results → Home shows new rating, STREAK 1, PLAY AGAIN; survives scene reload).
 - Capture: `docs/evidence/*-{1-home,2-trial-start,3-trial-solved,4-results,5-home-after}.png` at three aspect ratios.
 - Calibration fix found by tests: trial difficulty ratings moved to 1100/1300/1500 so weak sessions lose rating.
-- Not verified on device: the Android rebuild was stopped by host memory pressure (1.6 GB free of 16 GB). The Pixel 6a still runs the previous Shadow Match build.
+- Device (Pixel 6a, 1080×2400, 2026-09-24): fresh install → Home (anonymous profile, DAILY 023, UTC countdown) → three trials (trial 1 via real swipe-down = TIP FORWARD, trials 2–3 via buttons) → results 1200 → 1223, STREAK 1 → force-stop + relaunch shows 1223, STREAK 1, PLAY AGAIN. `profile.json` on device matches. Evidence in `artifacts/device/` (not committed).
+- Development APK is 71.5 MB: the Unity Pipeline package (editor automation, includes Roslyn) compiles into players only when `DEVELOPMENT_BUILD` is defined. Release builds exclude it.
+- Harmless log on device: Unity probes `com.google.android.play.core.assetpacks.AssetPackManager` (Play Asset Delivery not used).
 
 ## Next action
 
@@ -83,3 +85,11 @@ Verification (2026-09-24, in the open editor via Unity CLI Pipeline)
 ```
 
 Logs and test results go to `artifacts/logs/` (git-ignored). Unity must not have the project open during batchmode runs.
+
+With the editor open, use the Unity CLI instead (Pipeline package):
+
+```bash
+unity command run_tests --mode EditMode --timeout 300
+unity command run_tests --mode PlayMode --filter Uncategorized --filter_type category --async_tests true   # then: unity command test_status
+unity command build --target Android --outputPath <repo>/Builds/Android/RONRIKU.apk --options '["Development"]' --confirm true   # then: unity command build_status
+```

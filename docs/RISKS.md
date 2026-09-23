@@ -1,6 +1,6 @@
 # Risks and Blockers
 
-Updated: 2026-09-13
+Updated: 2026-09-24
 
 | Risk | Evidence | Fallback / mitigation | Completion step | User-visible consequence |
 |---|---|---|---|---|
@@ -10,5 +10,7 @@ Updated: 2026-09-13
 | Final audio and pixel font assets unavailable | Empty repository | Silent audio/haptic service and procedural pixel glyphs | License and import final assets during polish | Phase 1 has no final sound design |
 | Backend, wallet, and Devnet credentials unavailable | No project configuration or secrets supplied | Keep local mode and typed boundaries; never fabricate live state | Configure Supabase, Android MWA, and Devnet keys in later phases | Phase 1 is explicitly local |
 | Real device visual checks may differ from Editor capture | Cutouts, OEM scaling, and GPU drivers vary | Safe-area component and representative aspect screenshots | Run physical-device matrix | Minor spacing/performance issues may remain |
+| Unity 6.6 Android player crashes if its activity is recreated inside a live process (`UnityFoldingFeaturesWrapper.init() should be called only once`) | 3 of ~17 Pixel 6a launches issued within a second of `adb install -r` crashed (2026-09-24); 0 crashes on fresh installs, relaunches, or launches after a wait; not reproducible on demand | `AndroidManifestHardening` declares the config changes Unity misses so the system does not recreate the activity | Watch Android vitals once distributed; if seen on normal launches, switch `PlayerSettings.Android.applicationEntry` from GameActivity to Activity and re-test; report upstream | Possible crash on a config change not covered by `configChanges` |
+| Device-only profile in external app storage | `profile.json` lives in `/sdcard/Android/data/com.ronriku.game/files` | Local results are labelled LOCAL / practice and never competitive | Server-authoritative profile in the backend phase | A user with file access can edit local rating |
 
-No original user file was modified or deleted. The UUID reference images remain at repository root.
+The UUID-named reference PNGs were removed from the repository root on 2026-09-24 after confirming they are byte-identical to `docs/reference/home-v1.png` and `home-v2.png`.

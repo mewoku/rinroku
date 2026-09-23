@@ -83,6 +83,22 @@ Verification (2026-09-24)
 - Android build succeeded and installed on the Pixel 6a; hands-on device play of the new trials not yet done (phone in use).
 - Editor in-place APK updates leave ~39 MB of dead space between zip entries (93 MB file, 54 MB of entries); clean builds do not.
 
+## Optimisation and cleanup pass (2026-09-24)
+
+Changes
+- Release build path (`RONRIKU/Build Android (Release)`): High managed stripping with `link.xml` preserving `Ronriku.Runtime`, IL2CPP OptimizeSize + Release, engine stripping, R8 minify. Fresh APK file each build.
+- Player logs: no stack traces for Log/Warning, script-only for errors; local analytics silent in release.
+- Build gate now validates the next 60 Dailies across all three trial kinds.
+- Spatial screen moved onto `TrialScreenBase` (shared chrome, one completion path).
+- Fixes from the device pass: Pattern results row showed "1 / 0" (now CORRECT/MISSED/SKIPPED); CONTINUE reserved space so boards no longer jump; cube side height set to the 2:1 isometric value, removing a painter-order overlap; larger Home title and board.
+- Android manifest hook adds `colorMode|fontWeightAdjustment|grammaticalGender` to `configChanges` (see RISKS: engine crash on in-process activity recreation).
+- Removed duplicate root reference PNGs (identical to `docs/reference/`) and stale evidence of the retired rotation mechanic.
+
+Measured on Pixel 6a (release build)
+- APK 16.2 MB (was 42 MB dev build from Codex; 71–93 MB dev builds with in-place updates).
+- Cold start: 228–321 ms to first frame, ~720 ms fully drawn. Memory ~233 MB PSS (65 MB graphics).
+- Full practice Daily played on device: Pattern by tap, Spatial by real swipes (3 moves, at par), Link by one continuous drag (25/25, PERFECT ROUTE); results correctly PRACTICE // NOT RATED.
+
 ## Next action
 
 1. Hands-on Pixel 6a pass of Pattern and Link (drag feel, cell hit size on 6×6).

@@ -149,9 +149,7 @@ namespace Ronriku.Composition
                     break;
                 default:
                     _currentPuzzle = _spatialGenerator.Generate(spec.Seed, spec.Difficulty, 0);
-                    _safeRoot.Add(new SpatialPuzzleScreen(_currentPuzzle, _haptics, AbandonDaily,
-                        score => OnTrialCompleted(TrialOutcome.FromSpatial(_currentPuzzle, score)),
-                        header, footer, "<  HOME"));
+                    _safeRoot.Add(new SpatialPuzzleScreen(_currentPuzzle, context));
                     break;
             }
         }

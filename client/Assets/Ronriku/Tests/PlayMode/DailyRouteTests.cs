@@ -46,7 +46,7 @@ namespace Ronriku.Tests
 
             Assert.That(root.Q<PatternPuzzleScreen>(), Is.Not.Null, "trial 1 is Pattern");
             Assert.That(root.Q<Button>("option-0"), Is.Not.Null);
-            Assert.That(root.Q<Button>("continue-button").resolvedStyle.display, Is.EqualTo(DisplayStyle.None));
+            Assert.That(root.Q<Button>("continue-button").resolvedStyle.visibility, Is.EqualTo(Visibility.Hidden));
         }
 
         [UnityTest]
@@ -119,7 +119,7 @@ namespace Ronriku.Tests
                 }
             }
             yield return null;
-            Assert.That(root.Q<Button>("continue-button").resolvedStyle.display, Is.EqualTo(DisplayStyle.Flex));
+            Assert.That(root.Q<Button>("continue-button").resolvedStyle.visibility, Is.EqualTo(Visibility.Visible));
             Assert.That(root.Q<Button>("continue-button").text, Is.EqualTo("CONTINUE"));
         }
 

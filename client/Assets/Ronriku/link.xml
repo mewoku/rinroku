@@ -1,0 +1,4 @@
+<!-- Keep all game code under High managed stripping: JsonUtility and UI Toolkit reach types by reflection. -->
+<linker>
+  <assembly fullname="Ronriku.Runtime" preserve="all" />
+</linker>

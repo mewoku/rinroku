@@ -14,7 +14,9 @@ namespace Ronriku.Presentation.Components
     public sealed class IsometricBoardElement : VisualElement
     {
         private const float TileAspect = 0.5f;
-        private const float CubeHeight = 0.58f;
+        // Equal to TileAspect: in 2:1 isometric a unit cube's side is as tall as its top diamond.
+        // Any other value makes cubes on the same diagonal overlap and breaks painter ordering.
+        private const float CubeHeight = 0.5f;
         private const float SlabDepth = 0.34f;
         private const float TileInset = 0.94f;
 

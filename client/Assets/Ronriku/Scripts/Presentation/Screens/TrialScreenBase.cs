@@ -82,7 +82,8 @@ namespace Ronriku.Presentation.Screens
             Continue.name = "continue-button";
             Continue.style.height = 72;
             Continue.style.marginTop = 12;
-            Continue.style.display = DisplayStyle.None;
+            // Reserve the button's space from the start so revealing it never shifts the board.
+            Continue.style.visibility = Visibility.Hidden;
             Add(Continue);
 
             var footer = UiFactory.Label($"{context.Footer}   //   {contentHash.ToUpperInvariant()}", 12, RonrikuTheme.Muted);
@@ -128,7 +129,7 @@ namespace Ronriku.Presentation.Screens
             Continue.text = "CONTINUE";
             Continue.style.backgroundColor = RonrikuTheme.Teal;
             Continue.style.color = RonrikuTheme.Black;
-            Continue.style.display = DisplayStyle.Flex;
+            Continue.style.visibility = Visibility.Visible;
             if (solved) Haptics.Success(); else Haptics.Error();
         }
 
@@ -159,7 +160,7 @@ namespace Ronriku.Presentation.Screens
             Continue.text = "SKIP TRIAL";
             Continue.style.backgroundColor = RonrikuTheme.NearBlack;
             Continue.style.color = RonrikuTheme.OffWhite;
-            Continue.style.display = DisplayStyle.Flex;
+            Continue.style.visibility = Visibility.Visible;
         }
 
         private void Finish()

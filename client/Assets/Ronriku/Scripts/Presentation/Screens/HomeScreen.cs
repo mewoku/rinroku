@@ -43,17 +43,17 @@ namespace Ronriku.Presentation.Screens
             hero.style.justifyContent = Justify.Center;
             Add(hero);
 
-            var title = new PixelLabel("DAILY", RonrikuTheme.Teal, 16);
-            title.style.height = 132;
+            var title = new PixelLabel("DAILY", RonrikuTheme.Teal, 18);
+            title.style.height = 150;
             title.style.width = Length.Percent(100);
             hero.Add(title);
 
             var board = new IsometricBoardElement(model.PreviewCubes, model.PreviewOrientation);
             board.style.width = Length.Percent(100);
-            board.style.maxWidth = 820;
-            board.style.height = 760;
-            board.style.marginTop = -24;
-            board.style.marginBottom = -40;
+            board.style.maxWidth = 1000;
+            board.style.height = 980;
+            board.style.marginTop = -60;
+            board.style.marginBottom = -90;
             hero.Add(board);
 
             _meta = UiFactory.Label(string.Empty, 17, RonrikuTheme.Muted, FontStyle.Bold);

@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using Ronriku.Composition;
+using Ronriku.Domain.Daily;
 using Ronriku.Domain.Puzzles;
 using UnityEditor;
 using UnityEditor.Build;
@@ -23,26 +24,42 @@ namespace Ronriku.Editor
             ConfigureProject();
             CreateScene();
             VerifyDomain();
-            Debug.Log("RONRIKU_VERIFY_OK phase=1 aspectProfiles=720x1600,1080x2400,1440x3200");
+            Debug.Log("RONRIKU_VERIFY_OK");
         }
 
-        [MenuItem("RONRIKU/Build Android")]
-        public static void BuildAndroid()
+        [MenuItem("RONRIKU/Build Android (Development)")]
+        public static void BuildAndroid() => Build("RONRIKU-dev.apk", BuildOptions.Development);
+
+        [MenuItem("RONRIKU/Build Android (Release)")]
+        public static void BuildAndroidRelease() => Build("RONRIKU.apk", BuildOptions.None);
+
+        /// <summary>Applies the project's player settings without building. Safe to run any time.</summary>
+        [MenuItem("RONRIKU/Apply Project Settings")]
+        public static void ApplyProjectSettings()
+        {
+            ConfigureProject();
+            AssetDatabase.SaveAssets();
+            Debug.Log("RONRIKU_SETTINGS_APPLIED");
+        }
+
+        private static void Build(string fileName, BuildOptions buildOptions)
         {
             Verify();
-            string output = Path.GetFullPath(Path.Combine(Application.dataPath, "../../Builds/Android/RONRIKU.apk"));
+            string output = Path.GetFullPath(Path.Combine(Application.dataPath, "../../Builds/Android", fileName));
             Directory.CreateDirectory(Path.GetDirectoryName(output) ?? throw new InvalidOperationException());
+            // Always write a fresh file: in-place APK updates leave dead space between zip entries.
+            if (File.Exists(output)) File.Delete(output);
             var options = new BuildPlayerOptions
             {
                 scenes = new[] { ScenePath },
                 locationPathName = output,
                 target = BuildTarget.Android,
-                options = BuildOptions.Development
+                options = buildOptions
             };
             BuildReport report = BuildPipeline.BuildPlayer(options);
             if (report.summary.result != BuildResult.Succeeded)
                 throw new BuildFailedException($"Android build failed: {report.summary.result}");
-            Debug.Log($"RONRIKU_ANDROID_BUILD_OK path={output} bytes={report.summary.totalSize}");
+            Debug.Log($"RONRIKU_ANDROID_BUILD_OK path={output} bytes={new FileInfo(output).Length}");
         }
 
         private static void ConfigureProject()
@@ -60,6 +77,20 @@ namespace Ronriku.Editor
             PlayerSettings.Android.targetArchitectures = AndroidArchitecture.ARM64;
             PlayerSettings.SetScriptingBackend(NamedBuildTarget.Android, ScriptingImplementation.IL2CPP);
             PlayerSettings.colorSpace = ColorSpace.Linear;
+
+            // Size: strip unused engine and managed code; Ronriku.Runtime is preserved by link.xml.
+            PlayerSettings.stripEngineCode = true;
+            PlayerSettings.SetManagedStrippingLevel(NamedBuildTarget.Android, ManagedStrippingLevel.High);
+            PlayerSettings.SetIl2CppCodeGeneration(NamedBuildTarget.Android, Il2CppCodeGeneration.OptimizeSize);
+            PlayerSettings.SetIl2CppCompilerConfiguration(NamedBuildTarget.Android, Il2CppCompilerConfiguration.Release);
+            PlayerSettings.Android.minifyRelease = true;
+
+            // Runtime cost: plain logs carry no stack trace; errors keep script frames for diagnosis.
+            PlayerSettings.SetStackTraceLogType(LogType.Log, StackTraceLogType.None);
+            PlayerSettings.SetStackTraceLogType(LogType.Warning, StackTraceLogType.None);
+            PlayerSettings.SetStackTraceLogType(LogType.Error, StackTraceLogType.ScriptOnly);
+            PlayerSettings.SetStackTraceLogType(LogType.Assert, StackTraceLogType.ScriptOnly);
+            PlayerSettings.SetStackTraceLogType(LogType.Exception, StackTraceLogType.ScriptOnly);
         }
 
         private static void CreateScene()
@@ -107,17 +138,22 @@ namespace Ronriku.Editor
 
         private static void VerifyDomain()
         {
-            var generator = new SpatialPuzzleGenerator();
-            foreach (PuzzleDifficulty difficulty in Enum.GetValues(typeof(PuzzleDifficulty)))
-            for (long seed = 1; seed <= 500; seed++)
+            // Gate every build on the next 60 Dailies generating valid trials.
+            int today = DailyCalendar.DayNumber(DateTime.UtcNow);
+            var spatial = new SpatialPuzzleGenerator();
+            var pattern = new PatternPuzzleGenerator();
+            var logic = new LogicPuzzleGenerator();
+            for (int day = today; day < today + 60; day++)
+            foreach (TrialSpec spec in DailyPlan.For(day).Trials)
             {
-                SpatialPuzzleData first = generator.Generate(seed, difficulty, seed * 17);
-                SpatialPuzzleData second = generator.Generate(seed, difficulty, seed * 17);
-                if (first.Metadata.ContentHash != second.Metadata.ContentHash)
-                    throw new InvalidOperationException($"Generator is not deterministic at seed {seed} {difficulty}");
-                string violation = SpatialPuzzleInvariants.Check(first);
+                string violation = spec.Kind switch
+                {
+                    TrialKind.Pattern => PatternPuzzleInvariants.Check(pattern.Generate(spec.Seed, spec.Difficulty, 0)),
+                    TrialKind.Logic => LogicPuzzleInvariants.Check(logic.Generate(spec.Seed, spec.Difficulty, 0)),
+                    _ => SpatialPuzzleInvariants.Check(spatial.Generate(spec.Seed, spec.Difficulty, 0))
+                };
                 if (violation != null)
-                    throw new InvalidOperationException($"Invalid Spatial puzzle at seed {seed} {difficulty}: {violation}");
+                    throw new InvalidOperationException($"Invalid {spec.Kind} trial on day {day}: {violation}");
             }
         }
     }

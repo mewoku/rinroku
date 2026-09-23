@@ -67,7 +67,9 @@ namespace Ronriku.Presentation.Screens
             for (int i = 0; i < result.Outcomes.Count; i++)
             {
                 TrialOutcome o = result.Outcomes[i];
-                string status = o.Solved ? (o.Moves <= o.Par ? "AT PAR" : $"{o.Moves} / {o.Par}") : "SKIPPED";
+                string status = !o.Solved ? (o.Moves > 0 ? "MISSED" : "SKIPPED")
+                    : o.Par <= 0 ? "CORRECT"
+                    : o.Moves <= o.Par ? "AT PAR" : $"{o.Moves} / {o.Par}";
                 Add(Row($"{i + 1}   {o.Kind.ToString().ToUpperInvariant()}  {o.Difficulty.ToString().ToUpperInvariant()}",
                     $"{status}   {FormatTime(o.ElapsedMilliseconds)}", o.Solved ? RonrikuTheme.OffWhite : RonrikuTheme.Muted));
             }

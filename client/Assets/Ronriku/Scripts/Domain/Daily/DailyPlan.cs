@@ -10,7 +10,7 @@ namespace Ronriku.Domain.Daily
     /// </summary>
     public static class DailyCalendar
     {
-        public const int RulesVersion = 1;
+        public const int RulesVersion = 2;
         public static readonly DateTime Epoch = new DateTime(2026, 9, 1, 0, 0, 0, DateTimeKind.Utc);
 
         public static int DayNumber(DateTime utcNow) =>
@@ -86,17 +86,17 @@ namespace Ronriku.Domain.Daily
         }
 
         /// <summary>
-        /// Until Pattern and Logic ship, all three trials are Spatial with rising difficulty.
-        /// Changing this line-up requires bumping <see cref="DailyCalendar.RulesVersion"/>.
+        /// Pattern, Spatial, Logic — all Standard difficulty. Changing this line-up requires bumping
+        /// <see cref="DailyCalendar.RulesVersion"/>.
         /// </summary>
         public static DailyPlan For(int day)
         {
             long seed = DailyCalendar.Seed(day);
             var trials = new List<TrialSpec>
             {
-                new TrialSpec(0, TrialKind.Spatial, PuzzleDifficulty.Easy, Mix(seed, 1)),
+                new TrialSpec(0, TrialKind.Pattern, PuzzleDifficulty.Standard, Mix(seed, 1)),
                 new TrialSpec(1, TrialKind.Spatial, PuzzleDifficulty.Standard, Mix(seed, 2)),
-                new TrialSpec(2, TrialKind.Spatial, PuzzleDifficulty.Hard, Mix(seed, 3))
+                new TrialSpec(2, TrialKind.Logic, PuzzleDifficulty.Standard, Mix(seed, 3))
             };
             return new DailyPlan(day, trials.AsReadOnly());
         }

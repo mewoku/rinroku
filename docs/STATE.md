@@ -67,12 +67,29 @@ Verification (2026-09-24, in the open editor via Unity CLI Pipeline)
 - Development APK is 71.5 MB: the Unity Pipeline package (editor automation, includes Roslyn) compiles into players only when `DEVELOPMENT_BUILD` is defined. Release builds exclude it.
 - Harmless log on device: Unity probes `com.google.android.play.core.assetpacks.AssetPackManager` (Play Asset Delivery not used).
 
+## Phase 3 — Pattern and Logic
+
+Implemented
+- Pattern: 4×4 grids, rules rotate/mirror (Easy), + transpose/invert/shift (Standard), ordered pairs (Hard). Every single and pair hypothesis consistent with the examples must give the same test output (answer forced); decoys are outputs of other plausible rules. One choice, correct option position spread.
+- Logic ("LINK"): N×N (4/5/6) one-stroke path through every cell, numbers in order. Random Hamiltonian path via backbite moves; a pruned DFS solver adds clues until the solution is proven unique. Easy adds numbers only, Standard alternates walls and numbers, Hard prefers walls (~2 numbers + ~9 walls on 6×6).
+- Validators replay submitted answers (option index / cell path). `TrialScoring` shared points formula; per-difficulty targets and time limits.
+- `TrialScreenBase` shared chrome (timer, SKIP after limit, CONTINUE); `PatternPuzzleScreen`; `LogicPuzzleScreen` (drag to draw, drag back to retract, tap to cut, undo/reset; walls and out-of-order numbers blocked).
+- Daily rules v2: Pattern → Spatial → Logic, all Standard.
+
+Verification (2026-09-24)
+- EditMode 23/23 (Pattern bijective rules, 900 pattern puzzles valid + forced + unique hashes, 280 logic puzzles unique-solution, validator rejection cases, 120 Dailies generate valid trials of each kind).
+- PlayMode 2/2: full Pattern → Spatial → Logic Daily through the UI; profile persists.
+- Capture: `docs/evidence/*-2-trial{1,2,3}-start.png`, `*-3-trial{1,2,3}-solved.png`.
+- Android build succeeded and installed on the Pixel 6a; hands-on device play of the new trials not yet done (phone in use).
+- Editor in-place APK updates leave ~39 MB of dead space between zip entries (93 MB file, 54 MB of entries); clean builds do not.
+
 ## Next action
 
-1. Daily loop skeleton (priority 2 in spec §26): UTC-date seed, 3-trial orchestrator, results screen, local profile, rating, streak; remove placeholder Home data.
-2. Pattern and Logic mechanics into the orchestrator.
+1. Hands-on Pixel 6a pass of Pattern and Link (drag feel, cell hit size on 6×6).
+2. First-run flow (THREE TESTS. ONE MIND. EVERY DAY.) and one-line onboarding per trial.
 3. Home visual pass against `home-v2.png`.
-4. Attach a Seeker or create an AVD; verify install, swipe feel, haptics, FPS.
+4. Share card (spec §12) and friend-challenge link contract.
+5. Backend (Supabase) and Mobile Wallet Adapter per spec phases 5 and 8.
 
 ## Commands
 

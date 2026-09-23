@@ -52,15 +52,16 @@ namespace Ronriku.Tests
 
                     DailyRouteTests.Click(root.Q<Button>("begin-button"));
                     yield return Settle();
-                    Save(target, folder, profile.name, "2-trial-start");
+                    Save(target, folder, profile.name, "2-trial1-start");
 
                     for (int trial = 0; trial < 3; trial++)
                     {
                         yield return DailyRouteTests.SolveCurrent(app, root);
                         yield return Settle();
-                        if (trial == 1) Save(target, folder, profile.name, "3-trial-solved");
+                        Save(target, folder, profile.name, $"3-trial{trial + 1}-solved");
                         DailyRouteTests.Click(root.Q<Button>("continue-button"));
                         yield return Settle();
+                        if (trial < 2) Save(target, folder, profile.name, $"2-trial{trial + 2}-start");
                     }
 
                     yield return new WaitForSecondsRealtime(0.8f);

@@ -58,6 +58,33 @@ namespace Ronriku.Presentation.Components
             }
         }
 
+        /// <summary>Draws pixel text centred on <paramref name="center"/> into an existing painter.</summary>
+        public static void DrawCentered(Painter2D painter, string text, Vector2 center, float pixel, Color color)
+        {
+            if (string.IsNullOrEmpty(text)) return;
+            text = text.ToUpperInvariant();
+            float x = center.x - (text.Length * 6f * pixel - pixel) * 0.5f;
+            float y = center.y - 3.5f * pixel;
+            painter.fillColor = color;
+            foreach (char raw in text)
+            {
+                string[] glyph = Glyphs[Glyphs.ContainsKey(raw) ? raw : '?'];
+                for (int row = 0; row < 7; row++)
+                for (int col = 0; col < 5; col++)
+                {
+                    if (glyph[row][col] != '1') continue;
+                    painter.BeginPath();
+                    painter.MoveTo(new Vector2(x + col * pixel, y + row * pixel));
+                    painter.LineTo(new Vector2(x + (col + 1) * pixel, y + row * pixel));
+                    painter.LineTo(new Vector2(x + (col + 1) * pixel, y + (row + 1) * pixel));
+                    painter.LineTo(new Vector2(x + col * pixel, y + (row + 1) * pixel));
+                    painter.ClosePath();
+                    painter.Fill();
+                }
+                x += 6f * pixel;
+            }
+        }
+
         private static IReadOnlyDictionary<char, string[]> BuildGlyphs()
         {
             string[] rows = {
@@ -79,7 +106,10 @@ namespace Ronriku.Presentation.Components
                 "4:00010,00110,01010,10010,11111,00010,00010", "5:11111,10000,10000,11110,00001,00001,11110",
                 "6:01110,10000,10000,11110,10001,10001,01110", "7:11111,00001,00010,00100,01000,01000,01000",
                 "8:01110,10001,10001,01110,10001,10001,01110", "9:01110,10001,10001,01111,00001,00001,01110",
-                " :00000,00000,00000,00000,00000,00000,00000", "?:01110,10001,00010,00100,00100,00000,00100"
+                " :00000,00000,00000,00000,00000,00000,00000", "?:01110,10001,00010,00100,00100,00000,00100",
+                ">:01000,00100,00010,00001,00010,00100,01000", "<:00010,00100,01000,10000,01000,00100,00010",
+                "/:00001,00010,00010,00100,01000,01000,10000", "-:00000,00000,00000,11111,00000,00000,00000",
+                ".:00000,00000,00000,00000,00000,01100,01100"
             };
             var result = new Dictionary<char, string[]>();
             foreach (string row in rows)

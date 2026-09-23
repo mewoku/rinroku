@@ -5,6 +5,7 @@ using System.Reflection;
 using NUnit.Framework;
 using Ronriku.Composition;
 using Ronriku.Domain.Puzzles;
+using Ronriku.Presentation.Screens;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
@@ -43,7 +44,8 @@ namespace Ronriku.Tests
             Click(root.Q<Button>("begin-button"));
             yield return null;
 
-            Assert.That(root.Q<Button>("turn-left-button"), Is.Not.Null);
+            Assert.That(root.Q<PatternPuzzleScreen>(), Is.Not.Null, "trial 1 is Pattern");
+            Assert.That(root.Q<Button>("option-0"), Is.Not.Null);
             Assert.That(root.Q<Button>("continue-button").resolvedStyle.display, Is.EqualTo(DisplayStyle.None));
         }
 
@@ -94,17 +96,35 @@ namespace Ronriku.Tests
 
         internal static IEnumerator SolveCurrent(RonrikuBootstrap app, VisualElement root)
         {
-            var puzzle = (SpatialPuzzleData)typeof(RonrikuBootstrap)
-                .GetField("_currentPuzzle", BindingFlags.Instance | BindingFlags.NonPublic)
-                .GetValue(app);
-            Assert.That(puzzle, Is.Not.Null);
-            foreach (SpatialMove move in SpatialPuzzleSolver.Solve(puzzle))
+            if (Field<PatternPuzzleData>(app, "_currentPattern") is { } pattern)
             {
-                Click(root.Q<Button>(ButtonName(move)));
-                yield return new WaitForSecondsRealtime(0.25f);
+                Click(root.Q<Button>($"option-{pattern.CorrectOption}"));
+                yield return null;
             }
+            else if (Field<LogicPuzzleData>(app, "_currentLogic") is { } logic)
+            {
+                var screen = root.Q<LogicPuzzleScreen>();
+                var path = LogicPuzzleSolver.Solve(logic);
+                for (int i = 1; i < path.Count; i++) Assert.That(screen.TryExtend(path[i]), Is.True, $"step {i}");
+                yield return null;
+            }
+            else
+            {
+                var puzzle = Field<SpatialPuzzleData>(app, "_currentPuzzle");
+                Assert.That(puzzle, Is.Not.Null);
+                foreach (SpatialMove move in SpatialPuzzleSolver.Solve(puzzle))
+                {
+                    Click(root.Q<Button>(ButtonName(move)));
+                    yield return new WaitForSecondsRealtime(0.25f);
+                }
+            }
+            yield return null;
             Assert.That(root.Q<Button>("continue-button").resolvedStyle.display, Is.EqualTo(DisplayStyle.Flex));
+            Assert.That(root.Q<Button>("continue-button").text, Is.EqualTo("CONTINUE"));
         }
+
+        private static T Field<T>(RonrikuBootstrap app, string name) where T : class =>
+            typeof(RonrikuBootstrap).GetField(name, BindingFlags.Instance | BindingFlags.NonPublic)?.GetValue(app) as T;
 
         internal static string ButtonName(SpatialMove move) => move switch
         {

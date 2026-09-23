@@ -23,7 +23,7 @@ namespace Ronriku.Tests
             Assert.That(DailyCalendar.DayNumber(Utc(2026, 9, 23, 23, 59)), Is.EqualTo(23));
             Assert.That(DailyCalendar.DayNumber(Utc(2026, 9, 24)), Is.EqualTo(24));
             Assert.That(DailyCalendar.UntilReset(Utc(2026, 9, 23, 22, 30)), Is.EqualTo(TimeSpan.FromMinutes(90)));
-            Assert.That(DailyCalendar.ChallengeId(23), Is.EqualTo("daily-20260923-v1"));
+            Assert.That(DailyCalendar.ChallengeId(23), Is.EqualTo("daily-20260923-v2"));
         }
 
         [Test]
@@ -43,12 +43,28 @@ namespace Ronriku.Tests
         }
 
         [Test]
-        public void Plan_TrialsGenerateValidSpatialPuzzles()
+        public void Plan_IsPatternSpatialLogic_AndEveryTrialGeneratesValidPuzzles()
         {
-            var generator = new SpatialPuzzleGenerator();
+            var spatial = new SpatialPuzzleGenerator();
+            var pattern = new PatternPuzzleGenerator();
+            var logic = new LogicPuzzleGenerator();
             for (int day = 1; day <= 120; day++)
-            foreach (TrialSpec spec in DailyPlan.For(day).Trials)
-                Assert.That(SpatialPuzzleInvariants.Check(generator.Generate(spec.Seed, spec.Difficulty, 0)), Is.Null);
+            {
+                DailyPlan plan = DailyPlan.For(day);
+                Assert.That(plan.Trials[0].Kind, Is.EqualTo(TrialKind.Pattern));
+                Assert.That(plan.Trials[1].Kind, Is.EqualTo(TrialKind.Spatial));
+                Assert.That(plan.Trials[2].Kind, Is.EqualTo(TrialKind.Logic));
+                foreach (TrialSpec spec in plan.Trials)
+                {
+                    string violation = spec.Kind switch
+                    {
+                        TrialKind.Pattern => PatternPuzzleInvariants.Check(pattern.Generate(spec.Seed, spec.Difficulty, 0)),
+                        TrialKind.Logic => LogicPuzzleInvariants.Check(logic.Generate(spec.Seed, spec.Difficulty, 0)),
+                        _ => SpatialPuzzleInvariants.Check(spatial.Generate(spec.Seed, spec.Difficulty, 0))
+                    };
+                    Assert.That(violation, Is.Null, $"day {day} {spec.Kind}");
+                }
+            }
         }
 
         [Test]
@@ -58,7 +74,10 @@ namespace Ronriku.Tests
             for (int i = 0; i < DailyPlan.TrialCount; i++)
             {
                 Assert.That(session.Current.Index, Is.EqualTo(i));
-                session.Record(Outcome(true));
+                if (i == 0)
+                    Assert.Throws<ArgumentException>(() => session.Record(Outcome(true, kind: TrialKind.Logic)),
+                        "outcome kind must match the current trial");
+                session.Record(Outcome(true, kind: session.Current.Kind));
             }
             Assert.That(session.IsComplete, Is.True);
             Assert.That(session.Current, Is.Null);
@@ -172,14 +191,15 @@ namespace Ronriku.Tests
             }
         }
 
-        private static TrialOutcome Outcome(bool solved, int elapsed = 20000, int moves = 3, int par = 3) =>
-            new TrialOutcome(TrialKind.Spatial, PuzzleDifficulty.Standard, solved, elapsed, 45000, moves, par, 0,
+        private static TrialOutcome Outcome(bool solved, int elapsed = 20000, int moves = 3, int par = 3,
+            TrialKind kind = TrialKind.Spatial) =>
+            new TrialOutcome(kind, PuzzleDifficulty.Standard, solved, elapsed, 45000, moves, par, 0,
                 solved ? 1200 : 0);
 
         private static DailySession Completed(int day)
         {
             var session = new DailySession(DailyPlan.For(day));
-            while (!session.IsComplete) session.Record(Outcome(true));
+            while (!session.IsComplete) session.Record(Outcome(true, kind: session.Current.Kind));
             return session;
         }
     }

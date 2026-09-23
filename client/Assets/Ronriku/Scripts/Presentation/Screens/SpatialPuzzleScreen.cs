@@ -29,6 +29,8 @@ namespace Ronriku.Presentation.Screens
         private readonly Button _continue;
         private readonly List<SpatialMove> _path = new List<SpatialMove>();
         private IVisualElementScheduledItem _animation;
+        private IVisualElementScheduledItem _clock;
+        private bool _skipOffered;
         private SpatialAttemptScore _score;
         private int _orientation;
         private int _moves;
@@ -43,7 +45,8 @@ namespace Ronriku.Presentation.Screens
         private int _activePointer = -1;
 
         public SpatialPuzzleScreen(SpatialPuzzleData data, IHapticsService haptics, Action back,
-            Action<SpatialAttemptScore> completed)
+            Action<SpatialAttemptScore> completed, string header = "SPATIAL   //   PRACTICE",
+            string footer = null, string backLabel = "<  DAILY")
         {
             _data = data;
             _haptics = haptics;
@@ -59,11 +62,12 @@ namespace Ronriku.Presentation.Screens
             var top = new VisualElement();
             top.style.height = 80;
             top.style.flexDirection = FlexDirection.Row;
-            var backButton = UiFactory.Button("<  DAILY", back);
+            var backButton = UiFactory.Button(backLabel, back);
+            backButton.name = "back-button";
             backButton.style.width = 170;
             backButton.style.height = 56;
             top.Add(backButton);
-            var trial = UiFactory.Label("SPATIAL   //   PRACTICE", 16, RonrikuTheme.Muted, FontStyle.Bold);
+            var trial = UiFactory.Label(header, 16, RonrikuTheme.Muted, FontStyle.Bold);
             trial.style.flexGrow = 1;
             trial.style.unityTextAlign = TextAnchor.MiddleRight;
             top.Add(trial);
@@ -117,19 +121,21 @@ namespace Ronriku.Presentation.Screens
             _controls.Add(utilities);
             Add(_controls);
 
-            _continue = UiFactory.Button("CONTINUE", () => _completed?.Invoke(_score), true);
+            _continue = UiFactory.Button("CONTINUE", Finish, true);
             _continue.name = "continue-button";
             _continue.style.height = 72;
             _continue.style.marginTop = 12;
             _continue.style.display = DisplayStyle.None;
             Add(_continue);
 
-            var footer = UiFactory.Label($"LOCAL PRACTICE   //   {data.Metadata.ContentHash.ToUpperInvariant()}", 12,
+            var footerLabel = UiFactory.Label(
+                $"{footer ?? "LOCAL PRACTICE"}   //   {data.Metadata.ContentHash.ToUpperInvariant()}", 12,
                 RonrikuTheme.Muted);
-            footer.style.height = 40;
-            Add(footer);
+            footerLabel.style.height = 40;
+            Add(footerLabel);
 
             UpdateCounter();
+            _clock = schedule.Execute(Tick).Every(250);
         }
 
         private static VisualElement MapColumn(string label, VisualElement grid)
@@ -241,7 +247,7 @@ namespace Ronriku.Presentation.Screens
             }
 
             bool confirmed = _validator.IsCorrect(_data, _path);
-            int elapsed = Mathf.RoundToInt((Time.realtimeSinceStartup - _startedAt) * 1000f);
+            int elapsed = ElapsedMilliseconds;
             _score = new SpatialPuzzleScorer().Calculate(_data, confirmed, elapsed, _moves, _resets);
             if (!confirmed)
             {
@@ -252,6 +258,11 @@ namespace Ronriku.Presentation.Screens
             }
 
             _solved = true;
+            _clock?.Pause();
+            UpdateCounter();
+            _continue.text = "CONTINUE";
+            _continue.style.backgroundColor = RonrikuTheme.Teal;
+            _continue.style.color = RonrikuTheme.Black;
             _haptics.Success();
             _status.text = _score.AtPar
                 ? $"AT PAR   //   {FormatTime(elapsed)}   //   {_score.Points} PTS"
@@ -262,7 +273,33 @@ namespace Ronriku.Presentation.Screens
             _continue.style.display = DisplayStyle.Flex;
         }
 
-        private void UpdateCounter() => _counter.text = $"MOVES {_moves}   //   PAR {_data.Par}";
+        private int ElapsedMilliseconds => Mathf.RoundToInt((Time.realtimeSinceStartup - _startedAt) * 1000f);
+
+        private void UpdateCounter()
+        {
+            int shown = _solved ? _score.ElapsedMilliseconds : ElapsedMilliseconds;
+            _counter.text = $"MOVES {_moves}   //   PAR {_data.Par}   //   {shown / 60000:00}:{shown / 1000 % 60:00}";
+        }
+
+        private void Tick()
+        {
+            if (_solved) return;
+            UpdateCounter();
+            if (_skipOffered || ElapsedMilliseconds < _data.Metadata.TimeLimitSeconds * 1000) return;
+            _skipOffered = true;
+            _continue.text = "SKIP TRIAL";
+            _continue.style.backgroundColor = RonrikuTheme.NearBlack;
+            _continue.style.color = RonrikuTheme.OffWhite;
+            _continue.style.display = DisplayStyle.Flex;
+        }
+
+        private void Finish()
+        {
+            _clock?.Pause();
+            if (!_solved)
+                _score = new SpatialPuzzleScorer().Calculate(_data, false, ElapsedMilliseconds, _moves, _resets);
+            _completed?.Invoke(_score);
+        }
 
         private static string FormatTime(int ms) => $"{ms / 60000:00}:{ms / 1000 % 60:00}.{ms / 10 % 100:00}";
 

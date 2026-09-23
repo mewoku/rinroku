@@ -1,7 +1,9 @@
-using System;
 using System.Collections.Generic;
+using Ronriku.Domain.Daily;
+using Ronriku.Domain.Player;
 using Ronriku.Domain.Puzzles;
 using Ronriku.Infrastructure.Analytics;
+using Ronriku.Infrastructure.Persistence;
 using Ronriku.Presentation.Accessibility;
 using Ronriku.Presentation.Components;
 using Ronriku.Presentation.Screens;
@@ -13,11 +15,17 @@ namespace Ronriku.Composition
     [RequireComponent(typeof(UIDocument))]
     public sealed class RonrikuBootstrap : MonoBehaviour
     {
+        private static readonly string[] Numerals = { "I", "II", "III" };
+
+        private readonly SpatialPuzzleGenerator _spatialGenerator = new SpatialPuzzleGenerator();
         private UIDocument _document;
         private VisualElement _safeRoot;
         private IAnalyticsService _analytics;
         private IHapticsService _haptics;
-        private SpatialPuzzleData _puzzle;
+        private IProfileRepository _profiles;
+        private PlayerProfile _profile;
+        private DailySession _session;
+        private SpatialPuzzleData _currentPuzzle;
 
         private void Awake()
         {
@@ -25,12 +33,13 @@ namespace Ronriku.Composition
             Screen.orientation = ScreenOrientation.Portrait;
             _analytics = new LocalAnalyticsService();
             _haptics = new PlatformHapticsService();
-            _puzzle = new SpatialPuzzleGenerator().Generate(0x524F4E52494B55L, PuzzleDifficulty.Standard, 24);
+            _profiles = new JsonFileProfileRepository(RuntimeConfig.ProfileDirectory ?? Application.persistentDataPath);
+            _profile = _profiles.Load();
             _document = GetComponent<UIDocument>();
             ConfigurePanel();
             BuildRoot();
             ShowHome();
-            _analytics.Track("app_opened", new Dictionary<string, string> { ["environment"] = "local" });
+            _analytics.Track("app_opened", new Dictionary<string, string> { ["environment"] = RuntimeConfig.Environment });
         }
 
         private void ConfigurePanel()
@@ -71,38 +80,104 @@ namespace Ronriku.Composition
             _safeRoot.style.paddingBottom = safe.yMin * sy;
         }
 
+        private int Today => DailyCalendar.DayNumber(RuntimeConfig.UtcNow);
+
         private void ShowHome()
         {
+            _session = null;
+            _currentPuzzle = null;
+            int today = Today;
+            DailyPlan plan = DailyPlan.For(today);
+            SpatialPuzzleData preview = _spatialGenerator.Generate(plan.PreviewSeed, PuzzleDifficulty.Standard, 0);
+            var model = new HomeViewModel
+            {
+                DisplayName = _profile.displayName,
+                Level = _profile.Level,
+                Rating = _profile.rating,
+                DailyNumber = today,
+                Streak = _profile.DisplayStreak(today),
+                CompletedToday = _profile.HasCompleted(today),
+                LocalMode = !RuntimeConfig.Competitive,
+                PreviewCubes = preview.Cubes,
+                PreviewOrientation = preview.StartOrientation,
+                UntilReset = () => DailyCalendar.UntilReset(RuntimeConfig.UtcNow)
+            };
             _safeRoot.Clear();
-            _safeRoot.Add(new HomeScreen(_puzzle, _haptics, ShowPuzzle));
-            _analytics.Track("daily_viewed", Props());
+            _safeRoot.Add(new HomeScreen(model, _haptics, BeginDaily));
+            _analytics.Track("daily_viewed", DailyProps(plan));
         }
 
-        private void ShowPuzzle()
+        private void BeginDaily()
         {
-            _analytics.Track("daily_started", Props());
-            _analytics.Track("puzzle_started", Props());
+            _session = new DailySession(DailyPlan.For(Today));
+            _analytics.Track("daily_started", DailyProps(_session.Plan));
+            ShowTrial();
+        }
+
+        private void ShowTrial()
+        {
+            TrialSpec spec = _session.Current;
+            _currentPuzzle = _spatialGenerator.Generate(spec.Seed, spec.Difficulty, 0);
+            _analytics.Track("puzzle_started", TrialProps(spec));
+            string header = $"TRIAL {spec.Index + 1} / {_session.Plan.Trials.Count}   //   SPATIAL {Numerals[spec.Index]}";
+            string footer = $"DAILY {_session.Plan.Day:000}   //   {RuntimeConfig.Environment.ToUpperInvariant()}";
             _safeRoot.Clear();
-            _safeRoot.Add(new SpatialPuzzleScreen(_puzzle, _haptics, ShowHome, OnSpatialCompleted));
+            _safeRoot.Add(new SpatialPuzzleScreen(_currentPuzzle, _haptics, AbandonDaily, OnSpatialCompleted,
+                header, footer, "<  HOME"));
         }
 
         private void OnSpatialCompleted(SpatialAttemptScore score)
         {
-            var props = Props();
+            TrialSpec spec = _session.Current;
+            var props = TrialProps(spec);
             props["duration_ms"] = score.ElapsedMilliseconds.ToString();
             props["moves"] = score.Moves.ToString();
             props["par"] = score.Par.ToString();
             props["resets"] = score.Resets.ToString();
             _analytics.Track(score.Solved ? "puzzle_solved" : "puzzle_failed", props);
+
+            _session.Record(TrialOutcome.FromSpatial(_currentPuzzle, score));
+            if (_session.IsComplete) FinishDaily();
+            else ShowTrial();
+        }
+
+        private void AbandonDaily()
+        {
+            if (_session?.Current != null) _analytics.Track("puzzle_abandoned", TrialProps(_session.Current));
             ShowHome();
         }
 
-        private Dictionary<string, string> Props() => new Dictionary<string, string>
+        private void FinishDaily()
         {
-            ["challenge_id"] = _puzzle.Metadata.Id,
-            ["challenge_version"] = _puzzle.Metadata.Version.ToString(),
-            ["puzzle_type"] = _puzzle.Metadata.Type,
-            ["environment"] = "local"
+            DailyResult result = DailyCompletion.Apply(_profile, _session);
+            if (result.Counted) _profiles.Save(_profile);
+
+            var props = DailyProps(_session.Plan);
+            props["duration_ms"] = result.ElapsedMilliseconds.ToString();
+            props["solved"] = result.Solved.ToString();
+            props["counted"] = result.Counted ? "1" : "0";
+            _analytics.Track("daily_completed", props);
+            _analytics.Track("results_viewed", DailyProps(_session.Plan));
+
+            _safeRoot.Clear();
+            _safeRoot.Add(new DailyResultsScreen(result, _session.Plan.Day, !RuntimeConfig.Competitive, _haptics, ShowHome));
+        }
+
+        private static Dictionary<string, string> DailyProps(DailyPlan plan) => new Dictionary<string, string>
+        {
+            ["challenge_id"] = plan.ChallengeId,
+            ["challenge_version"] = DailyCalendar.RulesVersion.ToString(),
+            ["environment"] = RuntimeConfig.Environment
         };
+
+        private Dictionary<string, string> TrialProps(TrialSpec spec)
+        {
+            var props = DailyProps(_session.Plan);
+            props["trial_index"] = spec.Index.ToString();
+            props["puzzle_type"] = spec.Kind.ToString().ToLowerInvariant();
+            props["difficulty"] = spec.Difficulty.ToString().ToLowerInvariant();
+            props["rules_version"] = SpatialPuzzleGenerator.CurrentRulesVersion.ToString();
+            return props;
+        }
     }
 }

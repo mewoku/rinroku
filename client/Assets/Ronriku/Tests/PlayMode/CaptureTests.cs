@@ -1,10 +1,8 @@
+using System;
 using System.Collections;
-using System.Collections.Generic;
 using System.IO;
-using System.Reflection;
 using NUnit.Framework;
 using Ronriku.Composition;
-using Ronriku.Domain.Puzzles;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
@@ -13,7 +11,7 @@ using UnityEngine.UIElements;
 namespace Ronriku.Tests
 {
     /// <summary>
-    /// Renders the UI into offscreen textures at representative portrait aspect ratios and
+    /// Renders the Daily flow into offscreen textures at representative portrait aspect ratios and
     /// writes PNG evidence to docs/evidence. Run with: scripts/unity-test.ps1 -Platform PlayMode -Category Capture
     /// </summary>
     [Category("Capture")]
@@ -27,47 +25,61 @@ namespace Ronriku.Tests
         };
 
         [UnityTest]
-        public IEnumerator CaptureHomeAndSpatial_AtRepresentativeAspectRatios()
+        public IEnumerator CaptureDailyFlow_AtRepresentativeAspectRatios()
         {
             string folder = Path.GetFullPath(Path.Combine(Application.dataPath, "../../docs/evidence"));
             Directory.CreateDirectory(folder);
 
             foreach (var profile in Profiles)
             {
-                SceneManager.LoadScene("Bootstrap");
-                yield return null;
-
-                var app = Object.FindAnyObjectByType<RonrikuBootstrap>();
-                var document = app.GetComponent<UIDocument>();
-                var target = new RenderTexture(profile.width, profile.height, 24, RenderTextureFormat.ARGB32,
-                    RenderTextureReadWrite.sRGB);
-                document.panelSettings = Object.Instantiate(document.panelSettings);
-                document.panelSettings.targetTexture = target;
-                yield return Settle();
-
-                var root = document.rootVisualElement;
-                Save(target, folder, profile.name, "1-home");
-
-                Click(root.Q<Button>("begin-button"));
-                yield return Settle();
-                Save(target, folder, profile.name, "2-spatial-start");
-
-                var puzzle = (SpatialPuzzleData)typeof(RonrikuBootstrap)
-                    .GetField("_puzzle", BindingFlags.Instance | BindingFlags.NonPublic)
-                    .GetValue(app);
-                IReadOnlyList<SpatialMove> solution = SpatialPuzzleSolver.Solve(puzzle);
-                for (int i = 0; i < solution.Count; i++)
+                string profileDir = Path.Combine(Path.GetTempPath(), "ronriku-capture-" + Guid.NewGuid().ToString("N"));
+                RuntimeConfig.ProfileDirectory = profileDir;
+                RuntimeConfig.UtcNowOverride = new DateTime(2026, 9, 23, 16, 41, 7, DateTimeKind.Utc);
+                try
                 {
-                    Click(root.Q<Button>(ButtonName(solution[i])));
-                    yield return new WaitForSecondsRealtime(0.3f);
-                    if (i == 0 && solution.Count > 1) Save(target, folder, profile.name, "3-spatial-move");
-                }
-                yield return Settle();
-                Save(target, folder, profile.name, "4-spatial-solved");
+                    SceneManager.LoadScene("Bootstrap");
+                    yield return null;
 
-                document.panelSettings.targetTexture = null;
-                target.Release();
-                Object.Destroy(target);
+                    var app = UnityEngine.Object.FindAnyObjectByType<RonrikuBootstrap>();
+                    var document = app.GetComponent<UIDocument>();
+                    var target = new RenderTexture(profile.width, profile.height, 24, RenderTextureFormat.ARGB32,
+                        RenderTextureReadWrite.sRGB);
+                    document.panelSettings = UnityEngine.Object.Instantiate(document.panelSettings);
+                    document.panelSettings.targetTexture = target;
+                    yield return Settle();
+                    var root = document.rootVisualElement;
+                    Save(target, folder, profile.name, "1-home");
+
+                    DailyRouteTests.Click(root.Q<Button>("begin-button"));
+                    yield return Settle();
+                    Save(target, folder, profile.name, "2-trial-start");
+
+                    for (int trial = 0; trial < 3; trial++)
+                    {
+                        yield return DailyRouteTests.SolveCurrent(app, root);
+                        yield return Settle();
+                        if (trial == 1) Save(target, folder, profile.name, "3-trial-solved");
+                        DailyRouteTests.Click(root.Q<Button>("continue-button"));
+                        yield return Settle();
+                    }
+
+                    yield return new WaitForSecondsRealtime(0.8f);
+                    yield return Settle();
+                    Save(target, folder, profile.name, "4-results");
+
+                    DailyRouteTests.Click(root.Q<Button>("home-button"));
+                    yield return Settle();
+                    Save(target, folder, profile.name, "5-home-after");
+
+                    document.panelSettings.targetTexture = null;
+                    target.Release();
+                    UnityEngine.Object.Destroy(target);
+                }
+                finally
+                {
+                    RuntimeConfig.Reset();
+                    if (Directory.Exists(profileDir)) Directory.Delete(profileDir, true);
+                }
             }
         }
 
@@ -86,23 +98,7 @@ namespace Ronriku.Tests
             texture.Apply();
             RenderTexture.active = previous;
             File.WriteAllBytes(Path.Combine(folder, $"{profile}-{step}.png"), texture.EncodeToPNG());
-            Object.Destroy(texture);
-        }
-
-        private static string ButtonName(SpatialMove move) => move switch
-        {
-            SpatialMove.TurnLeft => "turn-left-button",
-            SpatialMove.TurnRight => "turn-right-button",
-            SpatialMove.TipBack => "tip-back-button",
-            _ => "tip-forward-button"
-        };
-
-        private static void Click(Button button)
-        {
-            Assert.That(button, Is.Not.Null);
-            using var submit = NavigationSubmitEvent.GetPooled();
-            submit.target = button;
-            button.SendEvent(submit);
+            UnityEngine.Object.Destroy(texture);
         }
     }
 }

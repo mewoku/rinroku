@@ -1,6 +1,6 @@
 # Current State
 
-Updated: 2026-09-23
+Updated: 2026-09-24
 
 ## Active phase
 
@@ -45,6 +45,25 @@ Known gaps
 - `variantSeed` is recorded in metadata and hash but does not yet transform presentation.
 - No onboarding beyond the instruction line; first-time players may need a one-move demo.
 - Board leaves a gap above short structures on tall screens.
+
+## Phase 4 (pulled forward) — Daily loop
+
+Implemented
+- `DailyCalendar` (UTC day number from 2026-09-01, reset countdown, challenge id, seed) and `DailyPlan` (3 trials; currently Spatial Easy/Standard/Hard until Pattern and Logic ship).
+- `DailySession` trial orchestration; `TrialOutcome` (no solution data).
+- `ReasoningRating`: bounded Elo-style update, formula and constants documented in `Rating.cs`; per-skill ratings (Spatial, Planning, Speed so far).
+- `PlayerProfile` (schema v1, migration, history) and `DailyCompletion`: first completion per UTC day counts; replays and earlier days are practice; streak consecutive/gap/rewind rules.
+- `JsonFileProfileRepository`: atomic write, corrupt-file quarantine.
+- `RuntimeConfig`: central environment, profile directory and UTC override.
+- Home uses the real profile (anonymous `PLAYER XXXX`), live reset countdown, streak, PLAY AGAIN after completion. All hardcoded placeholder data removed.
+- Trials: header `TRIAL n / 3`, live timer, SKIP TRIAL after the time limit.
+- Results: time, solved/points, LOCAL MODE instead of a fake percentile, rating count-up, streak, per-trial rows, skill deltas.
+
+Verification (2026-09-24, in the open editor via Unity CLI Pipeline)
+- EditMode 17/17; PlayMode 2/2 (full Daily from fresh profile on a fixed date → results → Home shows new rating, STREAK 1, PLAY AGAIN; survives scene reload).
+- Capture: `docs/evidence/*-{1-home,2-trial-start,3-trial-solved,4-results,5-home-after}.png` at three aspect ratios.
+- Calibration fix found by tests: trial difficulty ratings moved to 1100/1300/1500 so weak sessions lose rating.
+- Not verified on device: the Android rebuild was stopped by host memory pressure (1.6 GB free of 16 GB). The Pixel 6a still runs the previous Shadow Match build.
 
 ## Next action
 

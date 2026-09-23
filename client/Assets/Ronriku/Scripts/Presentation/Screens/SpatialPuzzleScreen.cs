@@ -8,36 +8,53 @@ using UnityEngine.UIElements;
 
 namespace Ronriku.Presentation.Screens
 {
+    /// <summary>
+    /// Shadow Match host: turn and tip the structure until its shadow covers exactly the teal tiles.
+    /// Solving is detected after each settled move and confirmed by replaying the move path.
+    /// </summary>
     public sealed class SpatialPuzzleScreen : VisualElement
     {
+        private const float RotationSeconds = 0.16f;
+        private const float SwipeThreshold = 60f;
+
         private readonly SpatialPuzzleData _data;
         private readonly SpatialPuzzleValidator _validator = new SpatialPuzzleValidator();
         private readonly IHapticsService _haptics;
+        private readonly Action<SpatialAttemptScore> _completed;
         private readonly IsometricBoardElement _board;
+        private readonly ShadowGridElement _currentGrid;
         private readonly Label _status;
-        private readonly Stack<int> _history = new Stack<int>();
+        private readonly Label _counter;
+        private readonly VisualElement _controls;
+        private readonly Button _continue;
+        private readonly List<SpatialMove> _path = new List<SpatialMove>();
         private IVisualElementScheduledItem _animation;
+        private SpatialAttemptScore _score;
         private int _orientation;
-        private int _rotations;
+        private int _moves;
         private int _resets;
         private float _startedAt;
         private float _animationStartedAt;
-        private float _animationFrom;
-        private float _animationTo;
+        private Quaternion _animationFrom;
+        private Quaternion _animationTo;
         private bool _inputLocked;
+        private bool _solved;
         private Vector2 _pointerDown;
         private int _activePointer = -1;
 
-        public SpatialPuzzleScreen(SpatialPuzzleData data, IHapticsService haptics, Action back)
+        public SpatialPuzzleScreen(SpatialPuzzleData data, IHapticsService haptics, Action back,
+            Action<SpatialAttemptScore> completed)
         {
             _data = data;
             _haptics = haptics;
+            _completed = completed;
             _orientation = data.StartOrientation;
             _startedAt = Time.realtimeSinceStartup;
             style.flexGrow = 1;
             style.backgroundColor = RonrikuTheme.Graphite;
             style.paddingLeft = style.paddingRight = 48;
             style.paddingTop = 36;
+            style.paddingBottom = 24;
 
             var top = new VisualElement();
             top.style.height = 80;
@@ -46,159 +63,212 @@ namespace Ronriku.Presentation.Screens
             backButton.style.width = 170;
             backButton.style.height = 56;
             top.Add(backButton);
-            var trial = UiFactory.Label("TRIAL 1 / 3   //   SPATIAL", 16, RonrikuTheme.Muted, FontStyle.Bold);
+            var trial = UiFactory.Label("SPATIAL   //   PRACTICE", 16, RonrikuTheme.Muted, FontStyle.Bold);
             trial.style.flexGrow = 1;
             trial.style.unityTextAlign = TextAnchor.MiddleRight;
-            top.Add(trial); Add(top);
+            top.Add(trial);
+            Add(top);
 
-            var title = new PixelLabel("MATCH", RonrikuTheme.Teal, 9);
+            var title = new PixelLabel("SHADOW", RonrikuTheme.Teal, 9);
             title.style.height = 84;
             Add(title);
-            var instruction = UiFactory.Label("ROTATE THE STRUCTURE TO MATCH THE TARGET", 17, RonrikuTheme.OffWhite, FontStyle.Bold);
-            instruction.style.height = 48;
+            var instruction = UiFactory.Label("TURN AND TIP UNTIL THE SHADOW FILLS THE TEAL TILES", 16,
+                RonrikuTheme.OffWhite, FontStyle.Bold);
+            instruction.style.height = 44;
             Add(instruction);
 
-            var targetRow = new VisualElement();
-            targetRow.style.height = 330;
-            targetRow.style.alignItems = Align.Center;
-            targetRow.Add(UiFactory.Label("TARGET", 14, RonrikuTheme.Yellow, FontStyle.Bold));
-            var target = new IsometricBoardElement(data.Cubes, data.TargetOrientation, true);
-            target.style.width = 330; target.style.height = 280;
-            targetRow.Add(target); Add(targetRow);
+            var maps = new VisualElement();
+            maps.style.flexDirection = FlexDirection.Row;
+            maps.style.height = 200;
+            maps.style.marginTop = 12;
+            maps.Add(MapColumn("TARGET", new ShadowGridElement(data.TargetShadow, RonrikuTheme.Teal)));
+            _currentGrid = new ShadowGridElement(data.ShadowAt(_orientation), RonrikuTheme.OffWhite);
+            maps.Add(MapColumn("SHADOW", _currentGrid));
+            Add(maps);
 
-            _board = new IsometricBoardElement(data.Cubes, _orientation);
-            _board.style.flexGrow = 1;
-            _board.style.minHeight = 500;
-            var playfield = new VisualElement { name = "spatial-playfield" };
-            playfield.style.flexGrow = 1;
-            playfield.style.minHeight = 500;
-            playfield.Add(_board);
+            _board = new IsometricBoardElement(data.Cubes, _orientation, data.TargetShadow);
             _board.style.position = Position.Absolute;
             _board.style.left = _board.style.right = _board.style.top = _board.style.bottom = 0;
+            var playfield = new VisualElement { name = "spatial-playfield" };
+            playfield.style.flexGrow = 1;
+            playfield.style.minHeight = 420;
+            playfield.Add(_board);
             playfield.RegisterCallback<PointerDownEvent>(OnPointerDown);
             playfield.RegisterCallback<PointerUpEvent>(OnPointerUp);
             playfield.RegisterCallback<PointerCancelEvent>(OnPointerCancel);
             Add(playfield);
 
-            var controls = new VisualElement();
-            controls.style.flexDirection = FlexDirection.Row;
-            controls.style.height = 84;
-            var left = UiFactory.Button("ROTATE LEFT", () => Rotate(-1));
-            var right = UiFactory.Button("ROTATE RIGHT", () => Rotate(1));
-            left.style.flexGrow = right.style.flexGrow = 1;
-            left.style.marginRight = 7;
-            right.style.marginLeft = 7;
-            controls.Add(left); controls.Add(right); Add(controls);
-
-            var utilities = new VisualElement();
-            utilities.style.flexDirection = FlexDirection.Row;
-            utilities.style.height = 68;
-            var undo = UiFactory.Button("UNDO", Undo);
-            var reset = UiFactory.Button("RESET", Reset);
-            undo.style.flexGrow = reset.style.flexGrow = 1;
-            undo.style.height = reset.style.height = 54;
-            undo.style.marginRight = 7;
-            reset.style.marginLeft = 7;
-            utilities.Add(undo); utilities.Add(reset); Add(utilities);
-
-            _status = UiFactory.Label("SWIPE OR TAP ROTATE   //   CHECK WHEN READY", 15, RonrikuTheme.Muted, FontStyle.Bold);
-            _status.style.height = 56;
+            _counter = UiFactory.Label(string.Empty, 20, RonrikuTheme.OffWhite, FontStyle.Bold);
+            _counter.style.height = 44;
+            Add(_counter);
+            _status = UiFactory.Label("SWIPE THE BOARD OR USE THE CONTROLS", 15, RonrikuTheme.Muted, FontStyle.Bold);
+            _status.style.height = 48;
             Add(_status);
-            var check = UiFactory.Button("CHECK", Check, true);
-            check.name = "check-button";
-            check.style.height = 72;
-            Add(check);
-            var footer = UiFactory.Label($"LOCAL PRACTICE   //   {data.Metadata.ContentHash.ToUpperInvariant()}", 12, RonrikuTheme.Muted);
-            footer.style.height = 64;
+
+            _controls = new VisualElement();
+            _controls.Add(ControlRow(
+                ("<  TURN", "turn-left-button", () => Move(SpatialMove.TurnLeft)),
+                ("TURN  >", "turn-right-button", () => Move(SpatialMove.TurnRight))));
+            _controls.Add(ControlRow(
+                ("TIP BACK", "tip-back-button", () => Move(SpatialMove.TipBack)),
+                ("TIP FORWARD", "tip-forward-button", () => Move(SpatialMove.TipForward))));
+            var utilities = ControlRow(("UNDO", "undo-button", Undo), ("RESET", "reset-button", Reset));
+            foreach (var child in utilities.Children()) child.style.height = 54;
+            _controls.Add(utilities);
+            Add(_controls);
+
+            _continue = UiFactory.Button("CONTINUE", () => _completed?.Invoke(_score), true);
+            _continue.name = "continue-button";
+            _continue.style.height = 72;
+            _continue.style.marginTop = 12;
+            _continue.style.display = DisplayStyle.None;
+            Add(_continue);
+
+            var footer = UiFactory.Label($"LOCAL PRACTICE   //   {data.Metadata.ContentHash.ToUpperInvariant()}", 12,
+                RonrikuTheme.Muted);
+            footer.style.height = 40;
             Add(footer);
+
+            UpdateCounter();
         }
 
-        private void Rotate(int delta)
+        private static VisualElement MapColumn(string label, VisualElement grid)
         {
-            if (_inputLocked) return;
-            _history.Push(_orientation);
+            var column = new VisualElement();
+            column.style.flexGrow = 1;
+            column.style.flexBasis = 0;
+            column.style.alignItems = Align.Center;
+            var caption = UiFactory.Label(label, 14, label == "TARGET" ? RonrikuTheme.Teal : RonrikuTheme.Muted,
+                FontStyle.Bold);
+            caption.style.height = 32;
+            column.Add(caption);
+            grid.style.width = 220;
+            grid.style.flexGrow = 1;
+            column.Add(grid);
+            return column;
+        }
+
+        private static VisualElement ControlRow(params (string text, string name, Action action)[] buttons)
+        {
+            var row = new VisualElement();
+            row.style.flexDirection = FlexDirection.Row;
+            row.style.marginTop = 12;
+            for (int i = 0; i < buttons.Length; i++)
+            {
+                var button = UiFactory.Button(buttons[i].text, buttons[i].action);
+                button.name = buttons[i].name;
+                button.style.flexGrow = 1;
+                button.style.flexBasis = 0;
+                button.style.height = 76;
+                if (i > 0) button.style.marginLeft = 12;
+                row.Add(button);
+            }
+            return row;
+        }
+
+        private void Move(SpatialMove move)
+        {
+            if (_inputLocked || _solved) return;
             int from = _orientation;
-            _orientation = (_orientation + delta + 4) & 3;
-            _rotations++;
-            AnimateRotation(from, from + delta, _orientation);
-            _status.text = $"ORIENTATION {_orientation + 1} / 4";
-            _status.style.color = RonrikuTheme.Muted;
+            _orientation = CubeOrientations.Apply(_orientation, move);
+            _path.Add(move);
+            _moves++;
             _haptics.Selection();
-        }
-
-        private void Check()
-        {
-            if (_inputLocked) return;
-            bool correct = _validator.IsCorrect(_data, _orientation);
-            int elapsed = Mathf.RoundToInt((Time.realtimeSinceStartup - _startedAt) * 1000f);
-            SpatialAttemptScore score = new SpatialPuzzleScorer().Calculate(_data, correct, elapsed, _rotations, _resets);
-            _status.text = correct ? $"MATCH CONFIRMED   //   {score.Points} PTS" : "NOT A MATCH   //   KEEP ROTATING";
-            _status.style.color = correct ? RonrikuTheme.Teal : RonrikuTheme.Yellow;
-            if (correct) _haptics.Success(); else _haptics.Error();
+            AnimateTo(from, _orientation);
         }
 
         private void Undo()
         {
-            if (_inputLocked || _history.Count == 0) return;
-            int target = _history.Pop();
+            if (_inputLocked || _solved || _path.Count == 0) return;
+            SpatialMove last = _path[_path.Count - 1];
+            _path.RemoveAt(_path.Count - 1);
             int from = _orientation;
-            int delta = target - from;
-            if (delta > 2) delta -= 4;
-            if (delta < -2) delta += 4;
-            _orientation = target;
-            AnimateRotation(from, from + delta, target);
-            _status.text = "LAST ROTATION UNDONE";
-            _status.style.color = RonrikuTheme.Muted;
+            _orientation = CubeOrientations.Apply(_orientation, CubeOrientations.Inverse(last));
             _haptics.Selection();
+            AnimateTo(from, _orientation);
         }
 
         private void Reset()
         {
-            if (_inputLocked) return;
-            _history.Clear();
+            if (_inputLocked || _solved || _path.Count == 0) return;
             int from = _orientation;
-            int target = _data.StartOrientation;
-            int delta = target - from;
-            if (delta > 2) delta -= 4;
-            if (delta < -2) delta += 4;
-            _orientation = target;
+            _orientation = _data.StartOrientation;
+            _path.Clear();
             _resets++;
-            AnimateRotation(from, from + delta, target);
-            _status.text = "STARTING ORIENTATION RESTORED";
-            _status.style.color = RonrikuTheme.Muted;
             _haptics.Selection();
+            AnimateTo(from, _orientation);
         }
 
-        private void AnimateRotation(float from, float to, int finalOrientation)
+        private void AnimateTo(int from, int to)
         {
+            UpdateCounter();
             bool reducedMotion = PlayerPrefs.GetInt("ronriku.reducedMotion", 0) == 1;
-            if (reducedMotion)
+            if (reducedMotion || from == to)
             {
-                _board.SetOrientation(finalOrientation);
+                _board.SetOrientation(to);
+                Settle();
                 return;
             }
             _animation?.Pause();
             _inputLocked = true;
-            _animationFrom = from;
-            _animationTo = to;
+            _animationFrom = IsometricBoardElement.ToQuaternion(from);
+            _animationTo = IsometricBoardElement.ToQuaternion(to);
             _animationStartedAt = Time.realtimeSinceStartup;
-            _animation = schedule.Execute(() => TickRotation(finalOrientation)).Every(16);
+            _animation = schedule.Execute(() => TickRotation(to)).Every(16);
         }
 
         private void TickRotation(int finalOrientation)
         {
-            float t = Mathf.Clamp01((Time.realtimeSinceStartup - _animationStartedAt) / 0.14f);
-            float eased = t * t * (3f - 2f * t);
-            _board.SetDisplayRotation(Mathf.Lerp(_animationFrom, _animationTo, eased));
+            float t = Mathf.Clamp01((Time.realtimeSinceStartup - _animationStartedAt) / RotationSeconds);
+            float eased = 1f - (1f - t) * (1f - t) * (1f - t);
+            _board.SetDisplayRotation(Quaternion.Slerp(_animationFrom, _animationTo, eased));
             if (t < 1f) return;
             _animation?.Pause();
             _board.SetOrientation(finalOrientation);
             _inputLocked = false;
+            Settle();
         }
+
+        private void Settle()
+        {
+            bool match = _data.IsSolvedAt(_orientation);
+            _currentGrid.SetMask(_data.ShadowAt(_orientation), match ? RonrikuTheme.Teal : RonrikuTheme.OffWhite);
+            if (!match)
+            {
+                _status.text = _path.Count == 0 ? "STARTING POSITION" : "NOT YET";
+                _status.style.color = RonrikuTheme.Muted;
+                return;
+            }
+
+            bool confirmed = _validator.IsCorrect(_data, _path);
+            int elapsed = Mathf.RoundToInt((Time.realtimeSinceStartup - _startedAt) * 1000f);
+            _score = new SpatialPuzzleScorer().Calculate(_data, confirmed, elapsed, _moves, _resets);
+            if (!confirmed)
+            {
+                _status.text = "MOVE PATH REJECTED   //   RESET";
+                _status.style.color = RonrikuTheme.Yellow;
+                _haptics.Error();
+                return;
+            }
+
+            _solved = true;
+            _haptics.Success();
+            _status.text = _score.AtPar
+                ? $"AT PAR   //   {FormatTime(elapsed)}   //   {_score.Points} PTS"
+                : $"SOLVED   //   {FormatTime(elapsed)}   //   {_score.Points} PTS";
+            _status.style.color = RonrikuTheme.Teal;
+            _controls.SetEnabled(false);
+            _controls.style.opacity = 0.35f;
+            _continue.style.display = DisplayStyle.Flex;
+        }
+
+        private void UpdateCounter() => _counter.text = $"MOVES {_moves}   //   PAR {_data.Par}";
+
+        private static string FormatTime(int ms) => $"{ms / 60000:00}:{ms / 1000 % 60:00}.{ms / 10 % 100:00}";
 
         private void OnPointerDown(PointerDownEvent evt)
         {
-            if (_inputLocked || _activePointer >= 0) return;
+            if (_inputLocked || _solved || _activePointer >= 0) return;
             _activePointer = evt.pointerId;
             _pointerDown = evt.position;
             (evt.currentTarget as VisualElement)?.CapturePointer(evt.pointerId);
@@ -208,9 +278,13 @@ namespace Ronriku.Presentation.Screens
         {
             if (evt.pointerId != _activePointer) return;
             (evt.currentTarget as VisualElement)?.ReleasePointer(evt.pointerId);
-            float delta = evt.position.x - _pointerDown.x;
             _activePointer = -1;
-            if (Mathf.Abs(delta) >= 60f) Rotate(delta < 0f ? 1 : -1);
+            Vector2 delta = (Vector2)evt.position - _pointerDown;
+            if (Mathf.Max(Mathf.Abs(delta.x), Mathf.Abs(delta.y)) < SwipeThreshold) return;
+            if (Mathf.Abs(delta.x) >= Mathf.Abs(delta.y))
+                Move(delta.x < 0f ? SpatialMove.TurnLeft : SpatialMove.TurnRight);
+            else
+                Move(delta.y > 0f ? SpatialMove.TipForward : SpatialMove.TipBack);
         }
 
         private void OnPointerCancel(PointerCancelEvent evt)

@@ -108,18 +108,16 @@ namespace Ronriku.Editor
         private static void VerifyDomain()
         {
             var generator = new SpatialPuzzleGenerator();
-            var validator = new SpatialPuzzleValidator();
+            foreach (PuzzleDifficulty difficulty in Enum.GetValues(typeof(PuzzleDifficulty)))
             for (long seed = 1; seed <= 500; seed++)
             {
-                SpatialPuzzleData first = generator.Generate(seed, PuzzleDifficulty.Standard, seed * 17);
-                SpatialPuzzleData second = generator.Generate(seed, PuzzleDifficulty.Standard, seed * 17);
+                SpatialPuzzleData first = generator.Generate(seed, difficulty, seed * 17);
+                SpatialPuzzleData second = generator.Generate(seed, difficulty, seed * 17);
                 if (first.Metadata.ContentHash != second.Metadata.ContentHash)
-                    throw new InvalidOperationException($"Generator is not deterministic at seed {seed}");
-                int accepted = 0;
-                for (int answer = 0; answer < 4; answer++) if (validator.IsCorrect(first, answer)) accepted++;
-                if (accepted != 1) throw new InvalidOperationException($"Expected one answer at seed {seed}");
-                if (first.StartOrientation == first.TargetOrientation)
-                    throw new InvalidOperationException($"Trivial puzzle at seed {seed}");
+                    throw new InvalidOperationException($"Generator is not deterministic at seed {seed} {difficulty}");
+                string violation = SpatialPuzzleInvariants.Check(first);
+                if (violation != null)
+                    throw new InvalidOperationException($"Invalid Spatial puzzle at seed {seed} {difficulty}: {violation}");
             }
         }
     }

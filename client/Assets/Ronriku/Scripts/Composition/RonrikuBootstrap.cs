@@ -83,7 +83,18 @@ namespace Ronriku.Composition
             _analytics.Track("daily_started", Props());
             _analytics.Track("puzzle_started", Props());
             _safeRoot.Clear();
-            _safeRoot.Add(new SpatialPuzzleScreen(_puzzle, _haptics, ShowHome));
+            _safeRoot.Add(new SpatialPuzzleScreen(_puzzle, _haptics, ShowHome, OnSpatialCompleted));
+        }
+
+        private void OnSpatialCompleted(SpatialAttemptScore score)
+        {
+            var props = Props();
+            props["duration_ms"] = score.ElapsedMilliseconds.ToString();
+            props["moves"] = score.Moves.ToString();
+            props["par"] = score.Par.ToString();
+            props["resets"] = score.Resets.ToString();
+            _analytics.Track(score.Solved ? "puzzle_solved" : "puzzle_failed", props);
+            ShowHome();
         }
 
         private Dictionary<string, string> Props() => new Dictionary<string, string>

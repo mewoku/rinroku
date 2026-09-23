@@ -1,60 +1,65 @@
 # Current State
 
-Updated: 2026-09-13
+Updated: 2026-09-23
 
 ## Active phase
 
-Phase 1 — visual vertical slice.
+Phase 2 — flagship Spatial puzzle (Shadow Match). Next: Phase 4-first Daily loop (see Next action).
 
-## Phase 0
+## Phase 0 — complete
 
-Status: complete
+Repository, toolchain (Unity `6000.6.0f1` at `D:\6000.6.0f1`), architecture, risks, and build scripts established. Git initialised 2026-09-23.
 
-Implemented
-- Inventoried the initially empty repository and preserved all supplied files.
-- Inspected both Home references and copied them to canonical paths.
-- Located Unity `6000.6.0f1`, bundled Android support/ADB, Java 17, .NET 8, and Git.
-- Established architecture, risk-ordered backlog, build commands, and explicit mocks/blockers.
+## Phase 1 — complete with caveats
 
-Verification
-- Unity license resolved as Personal in batch mode.
-- Project creation started through the installed Unity editor.
-- No Git repository existed, so there were no uncommitted changes to overwrite.
+Home shell, pixel `DAILY` title, isometric board, BEGIN, five-tab nav, safe area, theme, analytics and haptic boundaries, Android APK.
 
-Known risks
-- Android install/launch depends on a connected device or emulator.
-- Installed editor is Unity 6.6 Supported rather than Unity 6.3 LTS.
+Caveats
+- Home still shows hardcoded placeholder identity/metadata (`NAVAL`, `LEVEL 131`, `1821`, `3,842 ACTIVE`, `RESETS 07:18`, `DAILY 024`). Must be replaced by local profile + date-derived Daily before any demo.
+- Home layout leaves large empty bands above `DAILY` and below `BEGIN` versus `docs/reference/home-v2.png`.
+- BOSSES / CREATE / RANK / PROFILE tabs are disabled no-ops.
 
-## Phase 1
+## Phase 2 — Shadow Match (in progress)
 
-Status: partial — implementation and Android build complete; device launch and visual captures blocked by device/emulator availability
-
-Goal
-- Deliver a responsive, non-stock portrait Home screen that routes into a Spatial puzzle host and builds for Android.
+Mechanic
+- A rigid 4–6 cube structure sits in a 3×3×3 box above a 3×3 floor. Teal floor tiles are the target shadow.
+- Player moves: TURN left/right (90° about vertical) and TIP back/forward (90° about the floor axis). Swipe horizontally to turn, vertically to tip; buttons mirror both.
+- Solved when the top-down shadow covers exactly the teal tiles. A BFS solver gives par; the score rewards reaching par.
+- Rules version 2. Details in `docs/ARCHITECTURE.md`.
 
 Implemented
-- Portrait application shell with safe-area padding and 1080×2400 reference scaling.
-- Profile header, procedural pixel DAILY title, isometric teal/deep-blue board, yellow cubes, Daily metadata, hard-edged BEGIN action, and five-item bottom navigation.
-- Reusable routed Home and Spatial host views in a single generated scene.
-- Playable deterministic Spatial orientation trial with left/right 90° rotations, target comparison, feedback, and haptic hooks.
-- Centralized theme, local analytics boundary, reduced decorative motion, and platform haptics boundary.
-- ARM64 IL2CPP Android development APK.
+- `CubeOrientations` (24 rotations + transition table), `SpatialPuzzleGenerator`, `SpatialPuzzleSolver`, move-replay `SpatialPuzzleValidator`, `SpatialPuzzleInvariants`, par-based `SpatialPuzzleScorer`.
+- Renderer: quaternion-slerped rotation, structure drops to rest on floor, shadow overlay, floor slab.
+- `ShadowGridElement` target/current mini-maps (filled vs outlined cells, not colour-only).
+- Auto-detect solve after each settled move; CONTINUE returns to Home and emits `puzzle_solved`.
+- Android haptics: short `VibrationEffect` one-shots with `Handheld.Vibrate` fallback.
 
-Verification
-- Unity compile and `RonrikuBuild.Verify`: passed; generated `Assets/Ronriku/Scenes/Bootstrap.unity`.
-- Domain verification: 500 Standard seeds deterministic, unique, and non-trivial.
-- EditMode tests: 2 passed; 500 Hard determinism cases plus 1,500 seed/difficulty uniqueness cases.
-- PlayMode route test: 1 passed; Home contains BEGIN and routes to a Spatial host containing CHECK.
-- Android build: passed; `Builds/Android/RONRIKU.apk`, 28,505,512 bytes.
-- APK SHA-256: `08BDC78A84507BBE481A1C3E9DE2BE4E35EE8082F2D9AE426D77EE4221FAF1B3`.
-- Manifest inspection: package `com.ronriku.game`, min API 26, target/compile API 36, portrait launcher activity.
-- `adb devices -l`: no device attached. Existing SDK contains no configured AVD or system image, so install/launch was not possible.
-- Secret-pattern scan: no credential material found; matches were documentation warnings and an empty generated PlayStation field.
+Verification (2026-09-23)
+- EditMode: 7/7 passed — group closure, in-box rotation, determinism (1,500 seed×difficulty cases), invariants (1,500 cases: connected, in-box, unsolved start, solver par == stored par within difficulty range, validator accepts solver path, ≤4 matching orientations), variety, validator rejection cases, scorer.
+- PlayMode: 2/2 passed — Home → Spatial route; solver path clicked through real buttons reveals CONTINUE and returns Home.
+- Capture: `docs/evidence/{narrow-16x9,seeker-20x9,tall-22x9}-{1-home,2-spatial-start,3-spatial-move,4-spatial-solved}.png` rendered offscreen in batchmode and inspected.
+- Not verified: physical device install/launch, touch swipe feel, haptic feel, FPS. No AVD or device is attached (`adb devices` empty, `~/.android/avd` empty).
 
-Known risks
-- Composition has been implemented from both references but not visually captured from a running Android target at the three representative aspect ratios.
-- Physical-device FPS, safe-area cutout behavior, haptics, install, and launch remain unverified.
-- The installed editor is Unity 6.6 Supported rather than the current Unity 6.3 LTS line.
+Known gaps
+- `variantSeed` is recorded in metadata and hash but does not yet transform presentation.
+- No onboarding beyond the instruction line; first-time players may need a one-move demo.
+- Board leaves a gap above short structures on tall screens.
 
-Next action
-- Attach an Android device or configure an AVD, install the APK, capture narrow/typical/tall portrait evidence, and tune any optical spacing issues before marking Phase 1 complete. Then continue the full Spatial gesture/input work in Phase 2.
+## Next action
+
+1. Daily loop skeleton (priority 2 in spec §26): UTC-date seed, 3-trial orchestrator, results screen, local profile, rating, streak; remove placeholder Home data.
+2. Pattern and Logic mechanics into the orchestrator.
+3. Home visual pass against `home-v2.png`.
+4. Attach a Seeker or create an AVD; verify install, swipe feel, haptics, FPS.
+
+## Commands
+
+```powershell
+.\scripts\unity-test.ps1 -Platform EditMode
+.\scripts\unity-test.ps1 -Platform PlayMode
+.\scripts\unity-test.ps1 -Platform PlayMode -Category Capture   # writes docs/evidence PNGs
+.\scripts\unity-verify.ps1
+.\scripts\unity-build-android.ps1
+```
+
+Logs and test results go to `artifacts/logs/` (git-ignored). Unity must not have the project open during batchmode runs.

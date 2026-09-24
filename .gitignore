@@ -22,3 +22,8 @@ artifacts/
 .env.*
 !.env.example
 client/Assets/InitTestScene*
+node_modules/
+.next/
+dist/
+.env.local
+.env*.local

@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using Ronriku.Domain.Daily;
 using Ronriku.Domain.Player;
 using Ronriku.Domain.Puzzles;
+using Ronriku.Presentation.Accessibility;
 using Ronriku.Presentation.Components;
 using UnityEngine;
 using UnityEngine.UIElements;
@@ -26,14 +27,14 @@ namespace Ronriku.Presentation.Screens
         private int _activePointer = -1;
 
         public LogicPuzzleScreen(LogicPuzzleData data, TrialScreenContext context)
-            : base(context, "LINK", "CONNECT THE NUMBERS IN ORDER. FILL EVERY CELL", data.Metadata.TimeLimitSeconds,
+            : base(context, "LINK", "1 → 2 → 3 …  FILL EVERY CELL", data.Metadata.TimeLimitSeconds,
                 data.Metadata.ContentHash)
         {
             _data = data;
             _board = new LinkBoardElement(data) { name = "link-board" };
             _board.style.flexGrow = 1;
-            _board.style.marginTop = 16;
-            _board.style.marginBottom = 16;
+            _board.style.marginTop = 8;
+            _board.style.marginBottom = 8;
             _board.RegisterCallback<PointerDownEvent>(OnPointerDown);
             _board.RegisterCallback<PointerMoveEvent>(OnPointerMove);
             _board.RegisterCallback<PointerUpEvent>(OnPointerUp);
@@ -65,15 +66,30 @@ namespace Ronriku.Presentation.Screens
         {
             if (Solved || cell < 0 || _path.Contains(cell)) return false;
             int last = _path[_path.Count - 1];
-            if (!_data.CanStep(last, cell)) return false;
+            if (!_data.Adjacent(last, cell)) return false;
             int number = _data.Checkpoints[cell];
-            if (number != 0 && number != NextNumber()) return false;
-            if (number == _data.CheckpointCount && _path.Count + 1 != _data.CellCount) return false;
+            if (_data.HasWall(last, cell) || number != 0 && number != NextNumber() ||
+                number == _data.CheckpointCount && _path.Count + 1 != _data.CellCount)
+            {
+                Bump();
+                return false;
+            }
             _path.Add(cell);
             _moves++;
-            Haptics.Selection();
+            Feedback.Move();
             Refresh();
             return true;
+        }
+
+        private float _lastBump;
+
+        /// <summary>Invalid step: short error buzz, rate-limited so dragging along a wall doesn't spam.</summary>
+        private void Bump()
+        {
+            if (Time.realtimeSinceStartup - _lastBump < 0.35f) return;
+            _lastBump = Time.realtimeSinceStartup;
+            Feedback.Error();
+            _board.Flash();
         }
 
         private int NextNumber()
@@ -118,7 +134,7 @@ namespace Ronriku.Presentation.Screens
         private void Refresh()
         {
             bool complete = _path.Count == _data.CellCount && _validator.IsCorrect(_data, _path);
-            _board.SetPath(_path, complete);
+            _board.SetPath(_path, complete, NextNumber());
             UpdateCounter();
             if (complete)
             {

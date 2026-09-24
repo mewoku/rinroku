@@ -22,44 +22,45 @@ namespace Ronriku.Presentation.Screens
             _result = result;
             style.flexGrow = 1;
             style.backgroundColor = RonrikuTheme.Graphite;
-            style.paddingLeft = style.paddingRight = 48;
-            style.paddingTop = 48;
-            style.paddingBottom = 32;
+            style.paddingLeft = style.paddingRight = RonrikuTheme.Gutter;
+            style.paddingTop = 16;
+            style.paddingBottom = 16;
 
             var top = new VisualElement();
             top.style.flexGrow = 1;
             Add(top);
 
-            Add(Caption($"DAILY {dailyNumber:000}", RonrikuTheme.Muted, 16, 40));
-            var title = new PixelLabel(result.Solved == result.Trials ? "COMPLETE" : "FINISHED", RonrikuTheme.Teal, 10);
-            title.style.height = 100;
+            Add(Caption($"DAILY {dailyNumber:000}", RonrikuTheme.Muted, 11, 20));
+            var title = new PixelLabel(result.Solved == result.Trials ? "COMPLETE" : "FINISHED", RonrikuTheme.Frost.Accent, 6);
+            title.style.height = 56;
             Add(title);
 
-            var time = UiFactory.Label(FormatTime(result.ElapsedMilliseconds), 64, RonrikuTheme.OffWhite, FontStyle.Bold);
+            var time = UiFactory.Label(FormatTime(result.ElapsedMilliseconds), 36, RonrikuTheme.OffWhite, FontStyle.Bold);
             time.name = "result-time";
-            time.style.height = 96;
+            time.style.height = 48;
             Add(time);
-            Add(Caption($"{result.Solved} / {result.Trials} SOLVED   //   {result.Points} PTS", RonrikuTheme.Muted, 17, 40));
+            Add(Caption($"{result.Solved} / {result.Trials} SOLVED   //   {result.Points} PTS", RonrikuTheme.Muted, 12, 22));
+            if (result.ShardsEarned > 0) Add(Caption($"+{result.ShardsEarned} SHARDS", RonrikuTheme.Teal, 14, 24));
             Add(Caption(localMode ? "LOCAL MODE   //   NO GLOBAL PERCENTILE YET" : "PERCENTILE PENDING",
-                RonrikuTheme.BlueGrey, 14, 40));
+                RonrikuTheme.Muted, 10, 20));
 
             Add(Rule());
 
-            Add(Caption("REASONING RATING", RonrikuTheme.Muted, 14, 36));
-            _rating = UiFactory.Label(string.Empty, 44, RonrikuTheme.OffWhite, FontStyle.Bold);
+            Add(Caption("REASONING RATING", RonrikuTheme.Muted, 10, 18));
+            _rating = UiFactory.Label(string.Empty, 26, RonrikuTheme.OffWhite, FontStyle.Bold);
             _rating.name = "result-rating";
-            _rating.style.height = 72;
+            _rating.style.height = 36;
             Add(_rating);
             string deltaText = !result.Counted ? "PRACTICE   //   NOT RATED"
                 : result.RatingDelta >= 0 ? $"+{result.RatingDelta}" : result.RatingDelta.ToString();
             Color deltaColor = !result.Counted ? RonrikuTheme.Muted
                 : result.RatingDelta >= 0 ? RonrikuTheme.Teal : RonrikuTheme.Yellow;
-            Add(Caption(deltaText, deltaColor, 26, 48));
+            Add(Caption(deltaText, deltaColor, 16, 26));
 
-            var streak = new PixelLabel($"STREAK {result.StreakAfter}", RonrikuTheme.Yellow, 6);
+            var streak = new PixelLabel($"STREAK {result.StreakAfter}", RonrikuTheme.Yellow, 3);
             streak.name = "result-streak";
-            streak.style.height = 72;
-            streak.style.marginTop = 8;
+            streak.style.height = 32;
+            streak.style.marginTop = 4;
             Add(streak);
 
             Add(Rule());
@@ -78,16 +79,16 @@ namespace Ronriku.Presentation.Screens
             {
                 var skills = new VisualElement();
                 skills.style.flexDirection = FlexDirection.Row;
-                skills.style.marginTop = 20;
-                skills.style.height = 88;
+                skills.style.marginTop = 10;
+                skills.style.height = 48;
                 foreach (SkillChange change in result.Skills)
                 {
                     var cell = new VisualElement();
                     cell.style.flexGrow = 1;
                     cell.style.flexBasis = 0;
-                    cell.Add(Caption(change.Name.ToUpperInvariant(), RonrikuTheme.Muted, 13, 32));
+                    cell.Add(Caption(change.Name.ToUpperInvariant(), RonrikuTheme.Muted, 9, 18));
                     cell.Add(Caption(change.Delta >= 0 ? $"+{change.Delta}" : change.Delta.ToString(),
-                        change.Delta >= 0 ? RonrikuTheme.Teal : RonrikuTheme.Yellow, 22, 44));
+                        change.Delta >= 0 ? RonrikuTheme.Teal : RonrikuTheme.Yellow, 14, 24));
                     skills.Add(cell);
                 }
                 Add(skills);
@@ -97,9 +98,9 @@ namespace Ronriku.Presentation.Screens
             spacer.style.flexGrow = 1;
             Add(spacer);
 
-            var homeButton = UiFactory.Button("HOME", () => { haptics.Selection(); home(); }, true);
+            var homeButton = UiFactory.GlowButton("CONTINUE", () => { haptics.Selection(); home(); }, RonrikuTheme.Frost);
             homeButton.name = "home-button";
-            homeButton.style.height = 88;
+            homeButton.style.height = 52;
             Add(homeButton);
 
             _rating.text = result.RatingBefore.ToString();
@@ -107,7 +108,7 @@ namespace Ronriku.Presentation.Screens
             bool reducedMotion = PlayerPrefs.GetInt("ronriku.reducedMotion", 0) == 1;
             if (reducedMotion || !result.Counted) ShowFinalRating();
             else _countUp = schedule.Execute(TickRating).Every(16);
-            if (result.Counted) haptics.Success();
+            if (result.Counted) Accessibility.Feedback.Win();
         }
 
         private void TickRating()
@@ -136,11 +137,11 @@ namespace Ronriku.Presentation.Screens
         {
             var row = new VisualElement();
             row.style.flexDirection = FlexDirection.Row;
-            row.style.height = 52;
-            var l = UiFactory.Label(left, 17, color, FontStyle.Bold);
+            row.style.height = 28;
+            var l = UiFactory.Label(left, 11, color, FontStyle.Bold);
             l.style.flexGrow = 1;
             l.style.unityTextAlign = TextAnchor.MiddleLeft;
-            var r = UiFactory.Label(right, 17, color, FontStyle.Bold);
+            var r = UiFactory.Label(right, 11, color, FontStyle.Bold);
             r.style.unityTextAlign = TextAnchor.MiddleRight;
             row.Add(l);
             row.Add(r);
@@ -151,8 +152,8 @@ namespace Ronriku.Presentation.Screens
         {
             var rule = new VisualElement();
             rule.style.height = 2;
-            rule.style.marginTop = rule.style.marginBottom = 20;
-            rule.style.backgroundColor = RonrikuTheme.NearBlack;
+            rule.style.marginTop = rule.style.marginBottom = 10;
+            rule.style.backgroundColor = RonrikuTheme.Line;
             return rule;
         }
 

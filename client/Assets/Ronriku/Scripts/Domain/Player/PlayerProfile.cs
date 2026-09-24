@@ -24,6 +24,24 @@ namespace Ronriku.Domain.Player
         public int streak;
     }
 
+    [Serializable]
+    public sealed class OwnedFigure
+    {
+        public string id;
+        public string seed;
+        public int size;
+        public string acquired;
+    }
+
+    [Serializable]
+    public sealed class LevelRecord
+    {
+        public int world;
+        public int level;
+        public int stars;
+        public int bestMs;
+    }
+
     /// <summary>
     /// Persistent local profile. Public fields keep it serialisable by any JSON serializer.
     /// Bump <see cref="CurrentSchemaVersion"/> and extend <see cref="Migrate"/> for every shape change.
@@ -31,7 +49,7 @@ namespace Ronriku.Domain.Player
     [Serializable]
     public sealed class PlayerProfile
     {
-        public const int CurrentSchemaVersion = 1;
+        public const int CurrentSchemaVersion = 2;
         public const int HistoryLimit = 60;
         public const int XpPerLevel = 1000;
 
@@ -46,6 +64,27 @@ namespace Ronriku.Domain.Player
         public int lastCompletedDay;
         public List<SkillEntry> skills = new List<SkillEntry>();
         public List<DailyRecord> history = new List<DailyRecord>();
+
+        // v2: economy, collection, adventure.
+        public int shards;
+        public string avatarFigureId;
+        public List<OwnedFigure> figures = new List<OwnedFigure>();
+        public List<LevelRecord> levels = new List<LevelRecord>();
+
+        public OwnedFigure Avatar
+        {
+            get
+            {
+                foreach (var f in figures) if (f.id == avatarFigureId) return f;
+                return figures.Count > 0 ? figures[0] : null;
+            }
+        }
+
+        public LevelRecord LevelRecordFor(int world, int level)
+        {
+            foreach (var r in levels) if (r.world == world && r.level == level) return r;
+            return null;
+        }
 
         public int Level => 1 + xp / XpPerLevel;
 
@@ -72,6 +111,15 @@ namespace Ronriku.Domain.Player
             skills.Add(new SkillEntry { name = name, rating = value });
         }
 
+        /// <summary>Every profile starts with one 4×4 figure derived from its id so the avatar is personal.</summary>
+        private void GrantStarterFigure()
+        {
+            ulong seed = 1469598103934665603UL;
+            foreach (char c in playerId) seed = unchecked((seed ^ c) * 1099511628211UL);
+            figures.Add(new OwnedFigure { id = "starter", seed = seed.ToString(), size = 4, acquired = "starter" });
+            shards = Math.Max(shards, 150);
+        }
+
         public static PlayerProfile CreateNew(string playerId)
         {
             if (string.IsNullOrWhiteSpace(playerId)) throw new ArgumentException("Player id required.", nameof(playerId));
@@ -91,6 +139,10 @@ namespace Ronriku.Domain.Player
                 return false;
             skills ??= new List<SkillEntry>();
             history ??= new List<DailyRecord>();
+            figures ??= new List<OwnedFigure>();
+            levels ??= new List<LevelRecord>();
+            if (figures.Count == 0) GrantStarterFigure();
+            if (string.IsNullOrEmpty(avatarFigureId)) avatarFigureId = figures[0].id;
             foreach (string name in SkillDimensions.All)
             {
                 bool present = false;
@@ -132,6 +184,7 @@ namespace Ronriku.Domain.Player
         public int RatingAfter;
         public int StreakAfter;
         public bool Counted;
+        public int ShardsEarned;
         public IReadOnlyList<TrialOutcome> Outcomes;
         public IReadOnlyList<SkillChange> Skills;
 
@@ -193,6 +246,8 @@ namespace Ronriku.Domain.Player
             profile.lastCompletedDay = day;
             profile.completedDailies++;
             profile.xp += result.Points / 10;
+            result.ShardsEarned = Economy.DailyReward(profile.streak);
+            profile.shards += result.ShardsEarned;
             profile.history.Add(new DailyRecord
             {
                 day = day,

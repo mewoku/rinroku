@@ -1,8 +1,7 @@
 {
   "name": "Ronriku.Runtime",
   "rootNamespace": "Ronriku",
-  "references": [],
+  "references": ["Unity.InputSystem"],
   "autoReferenced": true,
   "noEngineReferences": false
 }
-

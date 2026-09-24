@@ -78,6 +78,10 @@ namespace Ronriku.Editor
             PlayerSettings.SetScriptingBackend(NamedBuildTarget.Android, ScriptingImplementation.IL2CPP);
             PlayerSettings.colorSpace = ColorSpace.Linear;
 
+            // No engine splash: the game shows its own pixel boot sequence.
+            PlayerSettings.SplashScreen.show = false;
+            PlayerSettings.SplashScreen.showUnityLogo = false;
+
             // Size: strip unused engine and managed code; Ronriku.Runtime is preserved by link.xml.
             PlayerSettings.stripEngineCode = true;
             PlayerSettings.SetManagedStrippingLevel(NamedBuildTarget.Android, ManagedStrippingLevel.High);
@@ -124,7 +128,7 @@ namespace Ronriku.Editor
             }
 
             panel.scaleMode = PanelScaleMode.ScaleWithScreenSize;
-            panel.referenceResolution = new Vector2Int(1080, 2400);
+            panel.referenceResolution = new Vector2Int(432, 960);
             panel.match = 0.5f;
             panel.clearColor = true;
             panel.colorClearValue = new Color32(0x28, 0x29, 0x2F, 0xFF);

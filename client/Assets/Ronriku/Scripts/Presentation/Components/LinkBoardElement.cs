@@ -11,17 +11,29 @@ namespace Ronriku.Presentation.Components
         private readonly LogicPuzzleData _data;
         private IReadOnlyList<int> _path = new List<int>();
         private bool _solved;
+        private int _next = 2;
+        private float _flashUntil;
 
         public LinkBoardElement(LogicPuzzleData data)
         {
             _data = data;
             generateVisualContent += Draw;
+            // Repaint for the pulsing "next number" and flash; cheap Painter2D redraw.
+            schedule.Execute(MarkDirtyRepaint).Every(66);
         }
 
-        public void SetPath(IReadOnlyList<int> path, bool solved)
+        public void SetPath(IReadOnlyList<int> path, bool solved, int next)
         {
             _path = path;
             _solved = solved;
+            _next = next;
+            MarkDirtyRepaint();
+        }
+
+        /// <summary>Brief red outline after an invalid move.</summary>
+        public void Flash()
+        {
+            _flashUntil = Time.realtimeSinceStartup + 0.25f;
             MarkDirtyRepaint();
         }
 
@@ -85,6 +97,23 @@ namespace Ronriku.Presentation.Components
                 Rect(p, mid - size * 0.5f, size.x, size.y, RonrikuTheme.Yellow);
             }
 
+            if (_path.Count > 0 && !_solved)
+            {
+                // Glowing head of the path.
+                Vector2 head = Center(_path[_path.Count - 1], origin, cell);
+                float r = cell * (0.18f + 0.04f * Mathf.Sin(Time.realtimeSinceStartup * 10f));
+                Rect(p, head - new Vector2(r, r), r * 2f, r * 2f, RonrikuTheme.Text);
+            }
+
+            if (Time.realtimeSinceStartup < _flashUntil)
+            {
+                float side = cell * _data.Size, w = Mathf.Max(4f, cell * 0.08f);
+                Rect(p, origin, side, w, RonrikuTheme.Red);
+                Rect(p, origin + new Vector2(0, side - w), side, w, RonrikuTheme.Red);
+                Rect(p, origin, w, side, RonrikuTheme.Red);
+                Rect(p, origin + new Vector2(side - w, 0), w, side, RonrikuTheme.Red);
+            }
+
             for (int i = 0; i < _data.CellCount; i++)
             {
                 int number = _data.Checkpoints[i];
@@ -92,7 +121,10 @@ namespace Ronriku.Presentation.Components
                 Vector2 c = Center(i, origin, cell);
                 float half = cell * 0.3f;
                 bool reached = visited.Contains(i);
-                Rect(p, c - new Vector2(half, half), half * 2f, half * 2f, reached ? RonrikuTheme.OffWhite : RonrikuTheme.Yellow);
+                bool next = !_solved && number == _next;
+                float pulse = next ? 1f + 0.12f * Mathf.Sin(Time.realtimeSinceStartup * 8f) : 1f;
+                float h = half * pulse;
+                Rect(p, c - new Vector2(h, h), h * 2f, h * 2f, reached ? RonrikuTheme.OffWhite : next ? RonrikuTheme.Gold : RonrikuTheme.Yellow);
                 string text = number.ToString();
                 float pixel = Mathf.Min(half * 1.5f / (text.Length * 6f), half * 1.4f / 7f);
                 PixelLabel.DrawCentered(p, text, c, pixel, RonrikuTheme.Black);

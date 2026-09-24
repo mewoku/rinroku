@@ -14,7 +14,7 @@ namespace Ronriku.Presentation.Screens
     public sealed class SpatialPuzzleScreen : TrialScreenBase
     {
         private const float RotationSeconds = 0.16f;
-        private const float SwipeThreshold = 60f;
+        private const float SwipeThreshold = 24f;
 
         private readonly SpatialPuzzleData _data;
         private readonly SpatialPuzzleValidator _validator = new SpatialPuzzleValidator();
@@ -31,9 +31,10 @@ namespace Ronriku.Presentation.Screens
         private bool _inputLocked;
         private Vector2 _pointerDown;
         private int _activePointer = -1;
+        private readonly PixelIcon _hint;
 
         public SpatialPuzzleScreen(SpatialPuzzleData data, TrialScreenContext context)
-            : base(context, "SHADOW", "TURN AND TIP UNTIL THE SHADOW FILLS THE TEAL TILES",
+            : base(context, "SHADOW", "MAKE THE SHADOW FILL THE GLOWING TILES",
                 data.Metadata.TimeLimitSeconds, data.Metadata.ContentHash)
         {
             _data = data;
@@ -41,8 +42,9 @@ namespace Ronriku.Presentation.Screens
 
             var maps = new VisualElement();
             maps.style.flexDirection = FlexDirection.Row;
-            maps.style.height = 200;
-            maps.style.marginTop = 12;
+            maps.style.height = 92;
+            maps.style.marginTop = 4;
+            maps.style.flexShrink = 0;
             maps.Add(MapColumn("TARGET", new ShadowGridElement(data.TargetShadow, RonrikuTheme.Teal)));
             _currentGrid = new ShadowGridElement(data.ShadowAt(_orientation), RonrikuTheme.OffWhite);
             maps.Add(MapColumn("SHADOW", _currentGrid));
@@ -53,8 +55,24 @@ namespace Ronriku.Presentation.Screens
             _board.style.left = _board.style.right = _board.style.top = _board.style.bottom = 0;
             var playfield = new VisualElement { name = "spatial-playfield" };
             playfield.style.flexGrow = 1;
-            playfield.style.minHeight = 420;
+            playfield.style.minHeight = 200;
             playfield.Add(_board);
+            _hint = new PixelIcon("hand", RonrikuTheme.Text, 36) { name = "swipe-hint" };
+            _hint.style.position = Position.Absolute;
+            _hint.style.left = Length.Percent(50);
+            _hint.style.top = Length.Percent(55);
+            playfield.Add(_hint);
+            _hint.schedule.Execute(() =>
+            {
+                if (_path.Count > 0 || Solved)
+                {
+                    _hint.style.display = DisplayStyle.None;
+                    return;
+                }
+                float t = Mathf.Repeat(Time.realtimeSinceStartup * 0.7f, 1f);
+                _hint.style.translate = new Translate(Mathf.Lerp(50f, -70f, Mathf.SmoothStep(0, 1, t)), 0);
+                _hint.style.opacity = Mathf.Sin(t * Mathf.PI) * 0.8f;
+            }).Every(33);
             playfield.RegisterCallback<PointerDownEvent>(OnPointerDown);
             playfield.RegisterCallback<PointerUpEvent>(OnPointerUp);
             playfield.RegisterCallback<PointerCancelEvent>(OnPointerCancel);
@@ -68,7 +86,7 @@ namespace Ronriku.Presentation.Screens
                 ("TIP FORWARD", "tip-forward-button", () => Move(SpatialMove.TipForward))));
             Controls.Add(ControlRow(("UNDO", "undo-button", Undo), ("RESET", "reset-button", Reset)));
 
-            SetStatus("SWIPE THE BOARD OR USE THE CONTROLS", RonrikuTheme.Muted);
+            SetStatus("SWIPE TO TURN  ·  SWIPE UP/DOWN TO TIP", RonrikuTheme.Muted);
             UpdateCounter();
         }
 
@@ -84,11 +102,10 @@ namespace Ronriku.Presentation.Screens
             column.style.flexGrow = 1;
             column.style.flexBasis = 0;
             column.style.alignItems = Align.Center;
-            var caption = UiFactory.Label(label, 14, label == "TARGET" ? RonrikuTheme.Teal : RonrikuTheme.Muted,
-                FontStyle.Bold);
-            caption.style.height = 32;
+            var caption = UiFactory.Heading(label, 9, label == "TARGET" ? RonrikuTheme.Teal : RonrikuTheme.Muted);
+            caption.style.height = 18;
             column.Add(caption);
-            grid.style.width = 220;
+            grid.style.width = 110;
             grid.style.flexGrow = 1;
             column.Add(grid);
             return column;
@@ -101,7 +118,7 @@ namespace Ronriku.Presentation.Screens
             _orientation = CubeOrientations.Apply(_orientation, move);
             _path.Add(move);
             _moves++;
-            Haptics.Selection();
+            Accessibility.Feedback.Move();
             AnimateTo(from, _orientation);
         }
 
@@ -163,7 +180,8 @@ namespace Ronriku.Presentation.Screens
             _currentGrid.SetMask(_data.ShadowAt(_orientation), match ? RonrikuTheme.Teal : RonrikuTheme.OffWhite);
             if (!match)
             {
-                SetStatus(_path.Count == 0 ? "STARTING POSITION" : "NOT YET", RonrikuTheme.Muted);
+                int overlap = OverlapCount();
+                SetStatus(_path.Count == 0 ? "STARTING POSITION" : $"{overlap} / {TargetCount()} TILES COVERED", RonrikuTheme.Muted);
                 return;
             }
             if (!_validator.IsCorrect(_data, _path))
@@ -173,6 +191,20 @@ namespace Ronriku.Presentation.Screens
                 return;
             }
             MarkFinished(true, _moves <= _data.Par ? "AT PAR" : "SOLVED", RonrikuTheme.Teal);
+        }
+
+        private int TargetCount()
+        {
+            int n = 0;
+            for (int i = 0; i < 9; i++) if ((_data.TargetShadow & (1 << i)) != 0) n++;
+            return n;
+        }
+
+        private int OverlapCount()
+        {
+            int both = _data.TargetShadow & _data.ShadowAt(_orientation), n = 0;
+            for (int i = 0; i < 9; i++) if ((both & (1 << i)) != 0) n++;
+            return n;
         }
 
         private void OnPointerDown(PointerDownEvent evt)

@@ -3,6 +3,7 @@ using System.Collections;
 using System.IO;
 using NUnit.Framework;
 using Ronriku.Composition;
+using Ronriku.Presentation.Shell;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.TestTools;
@@ -48,6 +49,17 @@ namespace Ronriku.Tests
                     document.panelSettings.targetTexture = target;
                     yield return Settle();
                     var root = document.rootVisualElement;
+                    yield return new WaitForSecondsRealtime(1.4f);
+                    yield return Settle();
+                    Save(target, folder, profile.name, "0-map");
+                    foreach (var tab in new[] { AppTab.Shop, AppTab.Bosses, AppTab.Me })
+                    {
+                        DailyRouteTests.ShowTab(app, tab);
+                        yield return Settle();
+                        Save(target, folder, profile.name, "0-" + tab.ToString().ToLowerInvariant());
+                    }
+                    DailyRouteTests.ShowTab(app, AppTab.Daily);
+                    yield return Settle();
                     Save(target, folder, profile.name, "1-home");
 
                     DailyRouteTests.Click(root.Q<Button>("begin-button"));

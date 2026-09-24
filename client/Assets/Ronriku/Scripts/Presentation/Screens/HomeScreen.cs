@@ -20,8 +20,10 @@ namespace Ronriku.Presentation.Screens
         public IReadOnlyList<GridPoint> PreviewCubes;
         public int PreviewOrientation;
         public Func<TimeSpan> UntilReset;
+        public int RewardShards;
     }
 
+    /// <summary>DAILY tab: today's three trials, reset countdown, streak and BEGIN.</summary>
     public sealed class HomeScreen : VisualElement
     {
         private readonly HomeViewModel _model;
@@ -30,59 +32,72 @@ namespace Ronriku.Presentation.Screens
         public HomeScreen(HomeViewModel model, IHapticsService haptics, Action begin)
         {
             _model = model;
+            name = "daily";
             style.flexGrow = 1;
-            style.backgroundColor = RonrikuTheme.Graphite;
-            style.paddingLeft = style.paddingRight = 48;
-            style.paddingTop = 34;
+            style.paddingLeft = style.paddingRight = RonrikuTheme.Gutter;
+            style.justifyContent = Justify.Center;
 
-            Add(ProfileHeader(model));
-
-            var hero = new VisualElement();
-            hero.style.flexGrow = 1;
-            hero.style.alignItems = Align.Center;
-            hero.style.justifyContent = Justify.Center;
-            Add(hero);
-
-            var title = new PixelLabel("DAILY", RonrikuTheme.Teal, 18);
-            title.style.height = 150;
-            title.style.width = Length.Percent(100);
-            hero.Add(title);
+            var title = new PixelLabel("DAILY", RonrikuTheme.Frost.Accent, 8);
+            title.style.height = 64;
+            Add(title);
+            var tagline = UiFactory.Heading("THREE TESTS. ONE MIND.", 11, RonrikuTheme.Muted);
+            tagline.style.marginBottom = 8;
+            Add(tagline);
 
             var board = new IsometricBoardElement(model.PreviewCubes, model.PreviewOrientation);
-            board.style.width = Length.Percent(100);
-            board.style.maxWidth = 1000;
-            board.style.height = 980;
-            board.style.marginTop = -60;
-            board.style.marginBottom = -90;
-            hero.Add(board);
+            board.style.height = 230;
+            board.style.marginTop = -10;
+            board.style.marginBottom = -20;
+            Add(board);
 
-            _meta = UiFactory.Label(string.Empty, 17, RonrikuTheme.Muted, FontStyle.Bold);
+            var trials = UiFactory.Row();
+            trials.style.justifyContent = Justify.SpaceBetween;
+            trials.style.marginTop = 8;
+            trials.Add(TrialCard("PATTERN", "pattern", RonrikuTheme.Pattern, 1));
+            trials.Add(TrialCard("SHADOW", "cube", RonrikuTheme.Lab, 2));
+            trials.Add(TrialCard("LINK", "link", RonrikuTheme.Link, 3));
+            Add(trials);
+
+            _meta = UiFactory.Label(string.Empty, 12, RonrikuTheme.Muted);
             _meta.name = "daily-meta";
-            _meta.style.height = 48;
-            hero.Add(_meta);
+            _meta.style.height = 32;
+            _meta.style.marginTop = 12;
+            Add(_meta);
 
-            var button = UiFactory.Button(model.CompletedToday ? "PLAY AGAIN" : "BEGIN",
-                () => { haptics.Selection(); begin(); }, !model.CompletedToday);
+            var button = model.CompletedToday
+                ? UiFactory.FlatButton("PLAY AGAIN", () => { haptics.Selection(); begin(); })
+                : UiFactory.GlowButton("BEGIN", () => { haptics.Selection(); begin(); }, RonrikuTheme.Frost);
             button.name = "begin-button";
-            button.style.width = Length.Percent(100);
-            button.style.maxWidth = 640;
-            button.style.height = 88;
-            button.style.marginTop = 16;
-            hero.Add(button);
+            button.style.height = 56;
+            button.style.marginTop = 4;
+            Add(button);
 
-            var note = UiFactory.Label(Note(model), 13, RonrikuTheme.BlueGrey, FontStyle.Bold);
-            note.style.height = 44;
-            hero.Add(note);
+            var note = UiFactory.Label(model.CompletedToday
+                ? "DONE TODAY  ·  REPLAYS ARE PRACTICE"
+                : $"+{model.RewardShards} SHARDS  ·  {(model.LocalMode ? "LOCAL MODE" : "RANKED")}", 10, RonrikuTheme.Muted);
+            note.style.marginTop = 10;
+            Add(note);
 
-            Add(BottomNavigation());
             UpdateMeta();
             schedule.Execute(UpdateMeta).Every(1000);
         }
 
-        private static string Note(HomeViewModel model)
+        private static VisualElement TrialCard(string title, string icon, Palette palette, int number)
         {
-            if (model.CompletedToday) return "COMPLETED TODAY   //   REPLAYS ARE PRACTICE";
-            return model.LocalMode ? "THREE TRIALS   //   LOCAL MODE" : "THREE TRIALS";
+            var card = UiFactory.Panel(RonrikuTheme.WithAlpha(palette.Accent, 0.55f));
+            card.style.width = Length.Percent(31.5f);
+            card.style.alignItems = Align.Center;
+            card.style.paddingTop = card.style.paddingBottom = 10;
+            card.style.backgroundImage = new StyleBackground(
+                PixelTextures.VerticalGradient(RonrikuTheme.WithAlpha(palette.Ambient, 0.9f), RonrikuTheme.WithAlpha(RonrikuTheme.Surface, 0.9f)));
+            card.style.backgroundSize = new BackgroundSize(Length.Percent(100), Length.Percent(100));
+            card.Add(UiFactory.Heading(number.ToString(), 10, RonrikuTheme.Muted));
+            var pixel = new PixelIcon(icon, palette.Accent, 28);
+            pixel.style.marginTop = 6;
+            pixel.style.marginBottom = 6;
+            card.Add(pixel);
+            card.Add(UiFactory.Heading(title, 10, RonrikuTheme.Text));
+            return card;
         }
 
         private void UpdateMeta()
@@ -90,68 +105,6 @@ namespace Ronriku.Presentation.Screens
             TimeSpan left = _model.UntilReset?.Invoke() ?? TimeSpan.Zero;
             string streak = _model.Streak > 0 ? $"   //   STREAK {_model.Streak}" : string.Empty;
             _meta.text = $"DAILY {_model.DailyNumber:000}   //   RESETS {(int)left.TotalHours:00}:{left.Minutes:00}:{left.Seconds:00}{streak}";
-        }
-
-        private static VisualElement ProfileHeader(HomeViewModel model)
-        {
-            var row = new VisualElement();
-            row.style.height = 108;
-            row.style.flexDirection = FlexDirection.Row;
-            row.style.alignItems = Align.Center;
-
-            var avatar = new VisualElement();
-            avatar.style.width = avatar.style.height = 76;
-            avatar.style.backgroundColor = RonrikuTheme.NearBlack;
-            avatar.style.borderLeftWidth = avatar.style.borderRightWidth = 4;
-            avatar.style.borderTopWidth = avatar.style.borderBottomWidth = 4;
-            avatar.style.borderLeftColor = avatar.style.borderRightColor = RonrikuTheme.Teal;
-            avatar.style.borderTopColor = avatar.style.borderBottomColor = RonrikuTheme.Teal;
-            var initial = new PixelLabel(model.DisplayName.Substring(0, 1), RonrikuTheme.Yellow, 6);
-            initial.style.flexGrow = 1;
-            avatar.Add(initial);
-            row.Add(avatar);
-
-            var identity = new VisualElement();
-            identity.style.flexGrow = 1;
-            identity.style.marginLeft = 22;
-            var name = UiFactory.Label(model.DisplayName, 26, RonrikuTheme.OffWhite, FontStyle.Bold);
-            name.name = "profile-name";
-            name.style.unityTextAlign = TextAnchor.MiddleLeft;
-            var level = UiFactory.Label($"LEVEL {model.Level}", 15, RonrikuTheme.Muted, FontStyle.Bold);
-            level.style.unityTextAlign = TextAnchor.MiddleLeft;
-            identity.Add(name); identity.Add(level); row.Add(identity);
-
-            var rating = new VisualElement();
-            var ratingLabel = UiFactory.Label("REASONING", 12, RonrikuTheme.Muted, FontStyle.Bold);
-            ratingLabel.style.unityTextAlign = TextAnchor.MiddleRight;
-            var ratingValue = UiFactory.Label(model.Rating.ToString(), 28, RonrikuTheme.OffWhite, FontStyle.Bold);
-            ratingValue.name = "profile-rating";
-            ratingValue.style.unityTextAlign = TextAnchor.MiddleRight;
-            rating.Add(ratingLabel); rating.Add(ratingValue); row.Add(rating);
-            return row;
-        }
-
-        private static VisualElement BottomNavigation()
-        {
-            var nav = new VisualElement();
-            nav.style.height = 118;
-            nav.style.flexDirection = FlexDirection.Row;
-            nav.style.alignItems = Align.Center;
-            nav.style.borderTopWidth = 2;
-            nav.style.borderTopColor = RonrikuTheme.BlueGrey;
-            string[] labels = { "DAILY", "BOSSES", "CREATE", "RANK", "PROFILE" };
-            foreach (string text in labels)
-            {
-                var item = UiFactory.Button(text, () => { });
-                item.SetEnabled(text == "DAILY");
-                item.style.flexGrow = 1;
-                item.style.height = 72;
-                item.style.fontSize = 12;
-                item.style.backgroundColor = Color.clear;
-                item.style.color = text == "DAILY" ? RonrikuTheme.Teal : RonrikuTheme.Muted;
-                nav.Add(item);
-            }
-            return nav;
         }
     }
 }

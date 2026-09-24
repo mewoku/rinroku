@@ -24,6 +24,13 @@ namespace Ronriku.Presentation.Components
             generateVisualContent += Draw;
         }
 
+        public void SetMask(int mask)
+        {
+            if (mask == _mask) return;
+            _mask = mask;
+            MarkDirtyRepaint();
+        }
+
         public void SetFrame(Color? frame)
         {
             _frame = frame;

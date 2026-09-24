@@ -54,6 +54,18 @@ namespace Ronriku.Domain.Adventure
             return events;
         }
 
+        /// <summary>
+        /// Records a win and returns the shards earned: the full reward on the first win of this boss,
+        /// nothing afterwards (matches backend finish_boss).
+        /// </summary>
+        public int RecordWin(PlayerProfile profile)
+        {
+            if (profile.bossWins.Contains(Id)) return 0;
+            profile.bossWins.Add(Id);
+            profile.shards += Reward;
+            return Reward;
+        }
+
         /// <summary>Deducts the entry. Returns false when the player cannot afford it.</summary>
         public bool TryEnter(PlayerProfile profile)
         {

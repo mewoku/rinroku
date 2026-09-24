@@ -70,6 +70,8 @@ namespace Ronriku.Domain.Player
         public string avatarFigureId;
         public List<OwnedFigure> figures = new List<OwnedFigure>();
         public List<LevelRecord> levels = new List<LevelRecord>();
+        /// <summary>Boss event ids already beaten; rewards pay once per boss, like the server.</summary>
+        public List<string> bossWins = new List<string>();
 
         public OwnedFigure Avatar
         {
@@ -140,6 +142,7 @@ namespace Ronriku.Domain.Player
             history ??= new List<DailyRecord>();
             figures ??= new List<OwnedFigure>();
             levels ??= new List<LevelRecord>();
+            bossWins ??= new List<string>();
             if (figures.Count == 0) GrantStarterFigure();
             if (string.IsNullOrEmpty(avatarFigureId)) avatarFigureId = figures[0].id;
             foreach (string name in SkillDimensions.All)
@@ -245,7 +248,8 @@ namespace Ronriku.Domain.Player
             profile.lastCompletedDay = day;
             profile.completedDailies++;
             profile.xp += result.Points / 10;
-            result.ShardsEarned = Economy.DailyReward(profile.streak);
+            // Like the server: a Daily with nothing solved pays no shards (anti-faucet).
+            result.ShardsEarned = result.Solved > 0 ? Economy.DailyReward(profile.streak) : 0;
             profile.shards += result.ShardsEarned;
             profile.history.Add(new DailyRecord
             {

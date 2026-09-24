@@ -121,6 +121,9 @@ namespace Ronriku.Tests
             p.shards = week[0].EntryShards;
             Assert.That(week[0].TryEnter(p), Is.True);
             Assert.That(p.shards, Is.Zero);
+            Assert.That(week[0].RecordWin(p), Is.EqualTo(week[0].Reward), "first win pays");
+            Assert.That(week[0].RecordWin(p), Is.Zero, "repeat wins pay nothing");
+            Assert.That(p.shards, Is.EqualTo(week[0].Reward));
         }
 
         [Test]

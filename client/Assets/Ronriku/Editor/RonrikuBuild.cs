@@ -33,6 +33,35 @@ namespace Ronriku.Editor
         [MenuItem("RONRIKU/Build Android (Release)")]
         public static void BuildAndroidRelease() => Build("RONRIKU.apk", BuildOptions.None);
 
+        /// <summary>
+        /// Browser build embedded by the website (web/public/unity/Build/unity.*). Gzip with the
+        /// decompression fallback so any static server works without special headers.
+        /// </summary>
+        [MenuItem("RONRIKU/Build WebGL (Website)")]
+        public static void BuildWebGL()
+        {
+            Verify();
+            string output = Path.GetFullPath(Path.Combine(Application.dataPath, "../../web/public/unity"));
+            if (Directory.Exists(output)) Directory.Delete(output, true);
+            PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Gzip;
+            PlayerSettings.WebGL.decompressionFallback = true;
+            PlayerSettings.WebGL.nameFilesAsHashes = false;
+            PlayerSettings.WebGL.dataCaching = true;
+            PlayerSettings.WebGL.memorySize = 256;
+            PlayerSettings.SetManagedStrippingLevel(NamedBuildTarget.WebGL, ManagedStrippingLevel.High);
+            var options = new BuildPlayerOptions
+            {
+                scenes = new[] { ScenePath },
+                locationPathName = output,
+                target = BuildTarget.WebGL,
+                options = BuildOptions.None
+            };
+            BuildReport report = BuildPipeline.BuildPlayer(options);
+            if (report.summary.result != BuildResult.Succeeded)
+                throw new BuildFailedException($"WebGL build failed: {report.summary.result}");
+            Debug.Log($"RONRIKU_WEBGL_BUILD_OK path={output} bytes={report.summary.totalSize}");
+        }
+
         /// <summary>Applies the project's player settings without building. Safe to run any time.</summary>
         [MenuItem("RONRIKU/Apply Project Settings")]
         public static void ApplyProjectSettings()

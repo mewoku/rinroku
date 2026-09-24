@@ -467,7 +467,7 @@ namespace Ronriku.Composition
             _analytics.Track("boss_started", new Dictionary<string, string> { ["boss"] = boss.Id });
             PlayBossStages(boss.Name, boss.Monster, boss.Stages(), 0, 0, new List<TrialOutcome>(), (elapsed, answers) =>
             {
-                _profile.shards += boss.Reward;
+                int earned = boss.RecordWin(_profile);
                 Save();
                 if (attempt != null) Submit("boss", () => _online.FinishBoss(attempt, answers, elapsed));
                 _analytics.Track("boss_completed", new Dictionary<string, string> { ["boss"] = boss.Id, ["duration_ms"] = elapsed.ToString() });
@@ -478,7 +478,7 @@ namespace Ronriku.Composition
                     Boss = true,
                     Title = boss.Name,
                     Stars = 3,
-                    ShardsEarned = boss.Reward,
+                    ShardsEarned = earned,
                     ElapsedMs = elapsed,
                     Monster = boss.Monster,
                     Palette = RonrikuTheme.Boss

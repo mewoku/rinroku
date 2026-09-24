@@ -8,8 +8,16 @@ const RARITY_VAR: Record<Rarity, string> = {
   Legendary: "var(--rarity-legendary)",
 };
 
+/** Same values as the --rarity-* tokens in styles/tokens.css, as hex so WebGL (three.js) can use them too. */
+const RARITY_HEX: Record<Rarity, string> = {
+  Common: "#8a94a6",
+  Rare: "#3a6bff",
+  Epic: "#ff4fd8",
+  Legendary: "#ffc83d",
+};
+
 export function rarityColor(r: Rarity): string {
-  return RARITY_VAR[r];
+  return RARITY_HEX[r];
 }
 
 /** Small pixel tag. Pass `rarity` for rarity colours or `color` for anything else. */

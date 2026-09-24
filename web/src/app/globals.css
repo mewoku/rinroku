@@ -1,0 +1,323 @@
+@import "tailwindcss";
+@import "../styles/tokens.css";
+
+@theme inline {
+  --color-bg-0: var(--bg-0);
+  --color-bg-1: var(--bg-1);
+  --color-surface-1: var(--surface-1);
+  --color-surface-2: var(--surface-2);
+  --color-line: var(--line);
+  --color-text: var(--text);
+  --color-muted: var(--muted);
+  --color-teal: var(--teal);
+  --color-yellow: var(--yellow);
+  --color-accent: var(--accent);
+  --color-accent-2: var(--accent-2);
+  --color-ambient: var(--ambient);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+  --color-danger: var(--danger);
+  --font-pixel: var(--font-silkscreen), ui-monospace, monospace;
+  --font-body: var(--font-pixelify), ui-monospace, monospace;
+  --radius-none: 0;
+}
+
+/* ---------- base ---------- */
+html {
+  /* Base gradient lives on the root so the fixed ambient canvas (z -10) paints above it. */
+  background: linear-gradient(180deg, var(--bg-0) 0%, var(--bg-1) 100%) fixed var(--bg-0);
+  color: var(--text);
+  color-scheme: dark;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  min-height: 100dvh;
+  font-family: var(--font-body);
+  font-size: var(--fs-body);
+  line-height: 24px;
+  background: transparent;
+  -webkit-tap-highlight-color: transparent;
+  overflow-x: hidden;
+}
+
+h1,
+h2,
+h3,
+h4,
+.font-pixel {
+  font-family: var(--font-pixel);
+  font-weight: 400;
+  letter-spacing: 0;
+}
+
+::selection {
+  background: var(--accent);
+  color: var(--accent-ink);
+}
+
+:focus-visible {
+  outline: 2px solid var(--yellow);
+  outline-offset: 2px;
+}
+
+.pixelated {
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+.tabular {
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---------- pixel borders: 2px outline with notched (missing) corners ---------- */
+.px-border {
+  --pb: var(--line);
+  box-shadow:
+    0 -2px 0 0 var(--pb),
+    0 2px 0 0 var(--pb),
+    -2px 0 0 0 var(--pb),
+    2px 0 0 0 var(--pb);
+}
+
+/* ---------- panels ---------- */
+.px-panel {
+  --pb: var(--line);
+  position: relative;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--surface-2) 92%, transparent), color-mix(in srgb, var(--surface-1) 92%, transparent));
+  box-shadow:
+    0 -2px 0 0 var(--pb),
+    0 2px 0 0 var(--pb),
+    -2px 0 0 0 var(--pb),
+    2px 0 0 0 var(--pb),
+    inset 0 2px 0 0 rgb(255 255 255 / 0.05),
+    0 6px 0 0 rgb(0 0 0 / 0.35);
+}
+.px-panel[data-accent="true"] {
+  --pb: color-mix(in srgb, var(--accent) 55%, var(--line));
+}
+.px-panel[data-accent="true"]::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 2px;
+  background: linear-gradient(90deg, var(--accent), var(--accent-2));
+}
+
+/* ---------- glow buttons ---------- */
+.px-btn {
+  --btn-a: var(--accent);
+  --btn-b: var(--accent-2);
+  --btn-ink: var(--accent-ink);
+  --depth: 4px;
+  position: relative;
+  isolation: isolate;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: var(--touch);
+  padding: 0 24px;
+  font-family: var(--font-pixel);
+  font-size: 16px;
+  line-height: 16px;
+  text-transform: uppercase;
+  color: var(--btn-ink);
+  background: transparent;
+  cursor: pointer;
+  user-select: none;
+  transition:
+    transform var(--t-fast) steps(2),
+    filter var(--t-fast);
+  margin-bottom: var(--depth);
+}
+/* fill + pixel border + depth */
+.px-btn::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(135deg, var(--btn-a) 0%, var(--btn-a) 35%, var(--btn-b) 100%);
+  box-shadow:
+    0 -2px 0 0 color-mix(in srgb, var(--btn-a) 70%, white),
+    -2px 0 0 0 color-mix(in srgb, var(--btn-a) 60%, black),
+    2px 0 0 0 color-mix(in srgb, var(--btn-b) 60%, black),
+    0 var(--depth) 0 0 color-mix(in srgb, var(--btn-b) 45%, black),
+    inset 0 2px 0 0 rgb(255 255 255 / 0.35),
+    inset 0 -2px 0 0 rgb(0 0 0 / 0.18);
+}
+/* dithered glow halo */
+.px-btn::before {
+  content: "";
+  position: absolute;
+  inset: -20px -28px;
+  z-index: -2;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--btn-a) 75%, transparent) 0%, color-mix(in srgb, var(--btn-b) 45%, transparent) 55%, transparent 100%);
+  -webkit-mask-image: conic-gradient(#000 25%, transparent 0 50%, #000 0 75%, transparent 0);
+  mask-image: conic-gradient(#000 25%, transparent 0 50%, #000 0 75%, transparent 0);
+  -webkit-mask-size: 4px 4px;
+  mask-size: 4px 4px;
+  opacity: 0.8;
+  pointer-events: none;
+  transition: opacity var(--t-med);
+}
+.px-btn:hover::before {
+  opacity: 1;
+}
+.px-btn:hover {
+  filter: brightness(1.06);
+}
+.px-btn:active,
+.px-btn[data-pressed="true"] {
+  transform: translateY(2px);
+  --depth: 2px;
+  margin-bottom: 4px;
+  filter: brightness(0.88);
+}
+.px-btn:disabled,
+.px-btn[aria-disabled="true"] {
+  cursor: not-allowed;
+  filter: grayscale(0.8) brightness(0.6);
+}
+.px-btn:disabled::before {
+  opacity: 0;
+}
+.px-btn[data-variant="secondary"] {
+  --btn-ink: var(--text);
+}
+.px-btn[data-variant="secondary"]::after {
+  background: linear-gradient(180deg, var(--surface-2), var(--surface-1));
+  box-shadow:
+    0 -2px 0 0 color-mix(in srgb, var(--btn-a) 70%, var(--line)),
+    0 2px 0 0 color-mix(in srgb, var(--btn-a) 40%, var(--line)),
+    -2px 0 0 0 color-mix(in srgb, var(--btn-a) 55%, var(--line)),
+    2px 0 0 0 color-mix(in srgb, var(--btn-a) 55%, var(--line)),
+    0 var(--depth) 0 0 rgb(0 0 0 / 0.5),
+    inset 0 2px 0 0 rgb(255 255 255 / 0.06);
+}
+.px-btn[data-variant="secondary"]::before {
+  opacity: 0.35;
+}
+.px-btn[data-variant="ghost"] {
+  --btn-ink: var(--muted);
+  margin-bottom: 0;
+}
+.px-btn[data-variant="ghost"]::after,
+.px-btn[data-variant="ghost"]::before {
+  display: none;
+}
+.px-btn[data-variant="ghost"]:hover {
+  color: var(--text);
+}
+.px-btn[data-size="sm"] {
+  min-height: 40px;
+  padding: 0 16px;
+  font-size: 12px;
+}
+.px-btn[data-size="lg"] {
+  min-height: 56px;
+  padding: 0 32px;
+  font-size: 20px;
+  line-height: 20px;
+}
+
+/* ---------- inputs ---------- */
+.px-input {
+  min-height: var(--touch);
+  width: 100%;
+  padding: 0 16px;
+  background: var(--bg-0);
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 16px;
+  box-shadow:
+    0 -2px 0 0 var(--line),
+    0 2px 0 0 var(--line),
+    -2px 0 0 0 var(--line),
+    2px 0 0 0 var(--line),
+    inset 0 2px 0 0 rgb(0 0 0 / 0.5);
+}
+.px-input:focus {
+  outline: none;
+  box-shadow:
+    0 -2px 0 0 var(--accent),
+    0 2px 0 0 var(--accent),
+    -2px 0 0 0 var(--accent),
+    2px 0 0 0 var(--accent),
+    inset 0 2px 0 0 rgb(0 0 0 / 0.5);
+}
+.px-input::placeholder {
+  color: color-mix(in srgb, var(--muted) 70%, transparent);
+}
+
+/* ---------- misc ---------- */
+.dither-bg {
+  background-image: conic-gradient(rgb(255 255 255 / 0.03) 25%, transparent 0 50%, rgb(255 255 255 / 0.03) 0 75%, transparent 0);
+  background-size: 4px 4px;
+}
+
+.glow-text {
+  text-shadow:
+    0 0 12px color-mix(in srgb, var(--accent) 60%, transparent),
+    0 4px 0 color-mix(in srgb, var(--accent-2) 70%, black);
+}
+
+.scanlines::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: repeating-linear-gradient(180deg, rgb(0 0 0 / 0.14) 0 2px, transparent 2px 4px);
+}
+
+@keyframes px-blink {
+  0%,
+  49% {
+    opacity: 1;
+  }
+  50%,
+  100% {
+    opacity: 0;
+  }
+}
+.px-blink {
+  animation: px-blink 1s steps(1) infinite;
+}
+
+@keyframes px-rise {
+  from {
+    transform: translateY(8px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+.px-rise {
+  animation: px-rise var(--t-slow) steps(4) both;
+}
+
+@keyframes px-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+.px-bob {
+  animation: px-bob 2.4s steps(4) infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .px-blink,
+  .px-rise,
+  .px-bob {
+    animation: none;
+  }
+}

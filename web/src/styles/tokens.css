@@ -1,0 +1,111 @@
+/*
+ * RONRIKU "Pixel Ambient" design tokens — PLAN_V2 §2.
+ * Mirrors client/.../RonrikuTheme.cs. Integer pixel sizes, 8px grid.
+ */
+:root {
+  /* Base */
+  --bg-0: #07080b;
+  --bg-1: #0e1016;
+  --surface-1: #14161d;
+  --surface-2: #1b1e27;
+  --line: #2a2f3b;
+  --text: #e7e8e5;
+  --muted: #8a94a6;
+
+  /* Brand */
+  --teal: #11c5b3;
+  --yellow: #e8da37;
+
+  /* World palettes: accent / accent2 / ambient */
+  --lab-accent: #11c5b3;
+  --lab-accent-2: #135b73;
+  --lab-ambient: #0b3b4a;
+  --pattern-accent: #ff4fd8;
+  --pattern-accent-2: #7b5cff;
+  --pattern-ambient: #2a1450;
+  --link-accent: #ffb347;
+  --link-accent-2: #ff6b5a;
+  --link-ambient: #4a1e12;
+  --forest-accent: #9be35a;
+  --forest-accent-2: #2f8f4e;
+  --forest-ambient: #10301a;
+  --frost-accent: #8fe3ff;
+  --frost-accent-2: #3a6bff;
+  --frost-ambient: #0c2250;
+  --boss-accent: #ff3b5c;
+  --boss-accent-2: #ffc83d;
+  --boss-ambient: #3a0a14;
+
+  /* Rarity */
+  --rarity-common: #8a94a6;
+  --rarity-rare: #3a6bff;
+  --rarity-epic: #ff4fd8;
+  --rarity-legendary: #ffc83d;
+
+  /* Status */
+  --ok: #9be35a;
+  --warn: #ffb347;
+  --danger: #ff3b5c;
+
+  /* Active palette (defaults to Lab / brand) */
+  --accent: var(--lab-accent);
+  --accent-2: var(--lab-accent-2);
+  --ambient: var(--lab-ambient);
+  --accent-ink: #07080b;
+
+  /* Grid + type (integer px only) */
+  --u: 8px;
+  --fs-xs: 10px;
+  --fs-sm: 12px;
+  --fs-body: 16px;
+  --fs-lg: 20px;
+  --fs-h3: 24px;
+  --fs-h2: 32px;
+  --fs-h1: 40px;
+  --touch: 48px;
+  --border: 2px;
+
+  /* Motion */
+  --t-fast: 80ms;
+  --t-med: 160ms;
+  --t-slow: 240ms;
+}
+
+[data-palette="lab"] {
+  --accent: var(--lab-accent);
+  --accent-2: var(--lab-accent-2);
+  --ambient: var(--lab-ambient);
+}
+[data-palette="pattern"] {
+  --accent: var(--pattern-accent);
+  --accent-2: var(--pattern-accent-2);
+  --ambient: var(--pattern-ambient);
+}
+[data-palette="link"] {
+  --accent: var(--link-accent);
+  --accent-2: var(--link-accent-2);
+  --ambient: var(--link-ambient);
+}
+[data-palette="forest"] {
+  --accent: var(--forest-accent);
+  --accent-2: var(--forest-accent-2);
+  --ambient: var(--forest-ambient);
+}
+[data-palette="frost"] {
+  --accent: var(--frost-accent);
+  --accent-2: var(--frost-accent-2);
+  --ambient: var(--frost-ambient);
+}
+[data-palette="boss"] {
+  --accent: var(--boss-accent);
+  --accent-2: var(--boss-accent-2);
+  --ambient: var(--boss-ambient);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :root {
+    --t-fast: 0ms;
+    --t-med: 0ms;
+    --t-slow: 0ms;
+  }
+}

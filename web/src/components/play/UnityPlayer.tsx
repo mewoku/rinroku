@@ -44,6 +44,8 @@ function UnityFrame({ build }: { build: UnityBuildFiles }) {
     companyName: "RONRIKU",
     productName: "RONRIKU",
     productVersion: "2",
+    // Unity 6 WebGL: flush persistentDataPath (profile.json) to IndexedDB so progress survives reloads.
+    autoSyncPersistentDataPath: true,
   });
   const [dpr, setDpr] = useState(1);
   useEffect(() => setDpr(Math.min(2, window.devicePixelRatio || 1)), []);

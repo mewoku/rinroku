@@ -62,11 +62,13 @@ namespace Ronriku.Presentation.Screens
             _hint.style.left = Length.Percent(50);
             _hint.style.top = Length.Percent(55);
             playfield.Add(_hint);
-            _hint.schedule.Execute(() =>
+            IVisualElementScheduledItem hintLoop = null;
+            hintLoop = _hint.schedule.Execute(() =>
             {
                 if (_path.Count > 0 || Solved)
                 {
                     _hint.style.display = DisplayStyle.None;
+                    hintLoop?.Pause();
                     return;
                 }
                 float t = Mathf.Repeat(Time.realtimeSinceStartup * 0.7f, 1f);

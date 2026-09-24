@@ -114,9 +114,10 @@ namespace Ronriku.Editor
             PlayerSettings.SplashScreen.show = false;
             PlayerSettings.SplashScreen.showUnityLogo = false;
 
-            // Local development backend is plain HTTP (127.0.0.1 via adb reverse). Production must use HTTPS
-            // and set this back to NotAllowed; see docs/RISKS.md.
-            PlayerSettings.insecureHttpOption = InsecureHttpOption.AlwaysAllowed;
+            // Cleartext HTTP only when the configured backend is http:// (local dev via adb reverse);
+            // an https:// backend turns it off automatically. See docs/RISKS.md.
+            PlayerSettings.insecureHttpOption = BackendIsCleartext() ? InsecureHttpOption.AlwaysAllowed : InsecureHttpOption.NotAllowed;
+            ConfigureSigning();
 
             // Size: strip unused engine and managed code; Ronriku.Runtime is preserved by link.xml.
             PlayerSettings.stripEngineCode = true;
@@ -133,8 +134,39 @@ namespace Ronriku.Editor
             PlayerSettings.SetStackTraceLogType(LogType.Exception, StackTraceLogType.ScriptOnly);
         }
 
+        private static bool BackendIsCleartext()
+        {
+            var config = AssetDatabase.LoadAssetAtPath<TextAsset>("Assets/Ronriku/Resources/ronriku-online.json");
+            return config != null && config.text.Contains("\"http://");
+        }
+
+        /// <summary>
+        /// Release signing from environment variables so the store key never lives in the repo:
+        /// RONRIKU_KEYSTORE (path), RONRIKU_KEYSTORE_PASS, RONRIKU_KEY_ALIAS, RONRIKU_KEY_PASS.
+        /// Without them the build is debug-signed (fine for local testing, rejected by the dApp Store).
+        /// </summary>
+        private static void ConfigureSigning()
+        {
+            string keystore = Environment.GetEnvironmentVariable("RONRIKU_KEYSTORE");
+            bool useCustom = !string.IsNullOrEmpty(keystore) && File.Exists(keystore);
+            PlayerSettings.Android.useCustomKeystore = useCustom;
+            if (!useCustom) return;
+            PlayerSettings.Android.keystoreName = keystore;
+            PlayerSettings.Android.keystorePass = Environment.GetEnvironmentVariable("RONRIKU_KEYSTORE_PASS") ?? string.Empty;
+            PlayerSettings.Android.keyaliasName = Environment.GetEnvironmentVariable("RONRIKU_KEY_ALIAS") ?? "ronriku";
+            PlayerSettings.Android.keyaliasPass = Environment.GetEnvironmentVariable("RONRIKU_KEY_PASS") ?? string.Empty;
+        }
+
         private static void CreateScene()
         {
+            // Regenerating the scene every build churns fileIDs in git; only create it when missing.
+            if (File.Exists(ScenePath))
+            {
+                EditorBuildSettings.scenes = new[] { new EditorBuildSettingsScene(ScenePath, true) };
+                CreatePanelSettings();
+                AssetDatabase.SaveAssets();
+                return;
+            }
             Directory.CreateDirectory(Path.GetDirectoryName(ScenePath) ?? throw new InvalidOperationException());
             Scene scene = EditorSceneManager.NewScene(NewSceneSetup.EmptyScene, NewSceneMode.Single);
             var cameraObject = new GameObject("Camera");

@@ -1,55 +1,56 @@
 # RONRIKU
 
-RONRIKU is a portrait mobile reasoning game for Android and the Solana Seeker, built with Unity. Each UTC day brings a Daily of three deterministic trials — Pattern, Spatial (Shadow Match) and Logic (Link) — scored into a persistent Reasoning Rating and streak. Everything currently runs locally; backend and wallet features are planned.
+A pixel-art reasoning game for Android / Solana Seeker and the browser. Walk an adventure map of voxel monsters you defeat with puzzles, play the three-trial DAILY (Pattern → Shadow → Link), raid weekly bosses, and collect MagicaVoxel-style voxel figures — bought with shards or devnet SOL and minted as Metaplex Core NFTs.
 
-## Toolchain
+- **Client**: Unity 6000.6 (Android + WebGL), UI Toolkit, pixelated 3D voxel renderer, offline-first.
+- **Backend**: Supabase (Postgres + RLS + RPCs); the server replays submitted answers instead of trusting "solved" flags.
+- **Core**: `packages/core`, a bit-for-bit TypeScript port of the C# domain (puzzles, figures, levels, shop, bosses).
+- **Website**: `web/`, Next.js site with the WebGL game, marketplace, leaderboards, friends and devnet SOL purchases.
 
-- Unity `6000.6.0f1` (installed at `D:\6000.6.0f1`)
-- Android Build Support from the Unity installation (IL2CPP, ARM64)
-- Package `com.ronriku.game`, portrait, API 26+
+Status, verification and open items: [docs/STATE.md](docs/STATE.md). Architecture and contracts: [docs/PLAN_V2.md](docs/PLAN_V2.md). Risks: [docs/RISKS.md](docs/RISKS.md).
 
-## Project layout
+## Fresh clone
 
-```
-client/                     Unity project
-  Assets/Ronriku/Scripts/
-    Domain/                 plain C#: puzzles, Daily plan, rating, profile
-    Infrastructure/         persistence, analytics
-    Presentation/           UI Toolkit screens and components
-    Composition/            bootstrap and runtime config
-  Assets/Ronriku/Tests/     EditMode (domain) and PlayMode (routes, capture)
-docs/                       state, architecture, risks, evidence screenshots
-scripts/                    batchmode test/verify/build helpers
-```
-
-The single scene `Bootstrap.unity` holds only a camera and the `RONRIKU` object. All screens are built in code at runtime, so the Scene view looks empty until you press Play.
-
-## Test
-
-With the editor closed (batchmode):
-
-```powershell
-.\scripts\unity-test.ps1 -Platform EditMode
-.\scripts\unity-test.ps1 -Platform PlayMode
-.\scripts\unity-test.ps1 -Platform PlayMode -Category Capture   # writes docs/evidence/*.png
-```
-
-With the editor open, use the Unity CLI (Pipeline package):
+Requirements: Unity **6000.6.0f1** with Android + WebGL modules, Node 24, pnpm 9, Docker Desktop.
 
 ```bash
-unity command run_tests --mode EditMode --timeout 600
-unity command run_tests --mode PlayMode --filter Uncategorized --filter_type category --async_tests true
-unity command test_status
+pnpm install
+pnpm build:core                      # web consumes @ronriku/core from dist/
+
+# Backend (local)
+cd backend
+npx supabase start
+npx supabase db reset
+pnpm publish:content                 # answer keys, shop shelf, bosses — required after every reset
+cd ..
+
+# Website
+cp web/.env.example web/.env.local   # fill from `npx supabase status -o env` (in backend/)
+pnpm --filter web create-treasury    # devnet treasury keypair into web/.env.local; fund it at faucet.solana.com
 ```
 
-## Build
+Unity (open `client/`):
 
-Menu **RONRIKU → Build Android (Release)** or `.\scripts\unity-build-android.ps1` writes a fresh `Builds/Android/RONRIKU.apk` (about 16 MB) plus `RONRIKU_mapping.txt` for de-obfuscating Java stack traces. **Build Android (Development)** writes `RONRIKU-dev.apk` with profiler support and the editor automation package.
+1. Menu **RONRIKU → Setup Fonts** (once; creates static pixel-font atlases).
+2. **RONRIKU → Build WebGL (Website)** → `web/public/unity/` (git-ignored).
+3. **RONRIKU → Build Android (Release)** → `Builds/Android/RONRIKU.apk`. Set `RONRIKU_KEYSTORE`, `RONRIKU_KEYSTORE_PASS`, `RONRIKU_KEY_ALIAS`, `RONRIKU_KEY_PASS` for a store-signed build; otherwise it is debug-signed.
 
-Every build first checks that the next 60 Dailies generate valid trials.
-
-```powershell
-& 'D:\6000.6.0f1\Editor\Data\PlaybackEngines\AndroidPlayer\SDK\platform-tools\adb.exe' install -r '.\Builds\Android\RONRIKU.apk'
+```bash
+pnpm --filter web build && pnpm --filter web start    # http://localhost:3000, game at /play
 ```
 
-See [docs/STATE.md](docs/STATE.md) for verified status, [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for design decisions and [docs/RISKS.md](docs/RISKS.md) for known risks.
+On a phone, `adb reverse tcp:54321 tcp:54321` lets the APK reach the local backend.
+
+## Tests
+
+```bash
+pnpm test:core                                 # 352 fixture tests vs C# exports
+(cd backend && pnpm test && npx supabase test db)   # integration + pgTAP
+pnpm --filter web test                         # web unit tests
+```
+
+Unity (editor open, via the Unity CLI): `unity command run_tests --mode EditMode`; PlayMode categories `Uncategorized`, `Online` (needs local backend) and `Capture` (writes `docs/evidence/`).
+
+## License
+
+Code: MIT (see [LICENSE](LICENSE)). Fonts: SIL OFL 1.1. Third-party notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).

@@ -1,0 +1,17 @@
+# Normalise text to LF in the repo and working tree (Unity and Node are fine with LF on Windows).
+* text=auto eol=lf
+
+# Unity YAML: merge with Unity's Smart Merge when configured (git config merge.unityyamlmerge.driver).
+*.unity  text eol=lf merge=unityyamlmerge
+*.prefab text eol=lf merge=unityyamlmerge
+*.asset  text eol=lf merge=unityyamlmerge
+*.meta   text eol=lf
+
+# Binaries.
+*.png binary
+*.jpg binary
+*.ttf binary
+*.vox binary
+*.apk binary
+*.unityweb binary
+*.wasm binary

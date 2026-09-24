@@ -16,7 +16,9 @@ namespace Ronriku.Presentation.Voxels
         private static int _slots;
 
         private readonly int _resolution;
+        private Figure _figure;
         private Mesh _mesh;
+        private bool _dirty = true;
         private GameObject _root;
         private Transform _model;
         private Camera _camera;
@@ -32,7 +34,10 @@ namespace Ronriku.Presentation.Voxels
 
         /// <param name="resolution">Render texture edge in pixels; lower = chunkier pixels.</param>
         public VoxelView(Figure figure, int resolution = 96, float spinDegreesPerSecond = 24f, bool interactive = true)
-            : this(VoxelMeshBuilder.Build(figure), resolution, spinDegreesPerSecond, interactive) { }
+            : this(VoxelMeshBuilder.Build(figure), resolution, spinDegreesPerSecond, interactive)
+        {
+            _figure = figure;
+        }
 
         public VoxelView(Mesh mesh, int resolution = 96, float spinDegreesPerSecond = 24f, bool interactive = true)
         {
@@ -55,11 +60,13 @@ namespace Ronriku.Presentation.Voxels
         public void SetFigure(Figure figure)
         {
             if (_mesh != null) Object.Destroy(_mesh);
+            _figure = figure;
             _mesh = VoxelMeshBuilder.Build(figure);
             if (_model != null)
             {
                 _model.GetComponent<MeshFilter>().sharedMesh = _mesh;
                 Frame();
+                _dirty = true;
             }
         }
 
@@ -73,6 +80,7 @@ namespace Ronriku.Presentation.Voxels
         private void Create()
         {
             if (_root != null) return;
+            if (_mesh == null && _figure != null) _mesh = VoxelMeshBuilder.Build(_figure);
             int slot = _slots++;
             _root = new GameObject("VoxelView") { hideFlags = HideFlags.HideAndDontSave, layer = Layer };
             _root.transform.position = new Vector3(10000f + slot * 100f, 10000f, 0f);
@@ -95,6 +103,8 @@ namespace Ronriku.Presentation.Voxels
             _camera.farClipPlane = 200f;
             _camera.allowMSAA = false;
             _camera.allowHDR = false;
+            // Rendered on demand from Tick: static views cost one render, not one per frame.
+            _camera.enabled = false;
 
             _texture = new RenderTexture(_resolution, _resolution, 16, RenderTextureFormat.ARGB32)
             {
@@ -133,9 +143,16 @@ namespace Ronriku.Presentation.Voxels
             _hop = Mathf.Max(0f, _hop - dt * 3.2f);
             float jump = Mathf.Sin(_hop * Mathf.PI) * 0.9f;
             float squash = 1f + (_hop > 0.85f ? (_hop - 0.85f) * 0.8f : 0f);
-            _model.localRotation = Quaternion.Euler(tilt.y * 8f, _yaw + tilt.x * 18f, 0f);
-            _model.localPosition = new Vector3(0f, jump, 0f);
-            _model.localScale = new Vector3(squash, 1f / squash, squash);
+            Quaternion rotation = Quaternion.Euler(tilt.y * 8f, _yaw + tilt.x * 18f, 0f);
+            var position = new Vector3(0f, jump, 0f);
+            var scale = new Vector3(squash, 1f / squash, squash);
+            bool changed = _dirty || rotation != _model.localRotation || position != _model.localPosition || scale != _model.localScale;
+            if (!changed) return;
+            _model.localRotation = rotation;
+            _model.localPosition = position;
+            _model.localScale = scale;
+            _dirty = false;
+            _camera.Render();
         }
 
         private void OnDown(PointerDownEvent e)
@@ -172,6 +189,12 @@ namespace Ronriku.Presentation.Voxels
                 Object.Destroy(_texture);
             }
             if (_material != null) Object.Destroy(_material);
+            if (_mesh != null && _figure != null)
+            {
+                // Owned mesh: rebuilt from the figure if the view is attached again.
+                Object.Destroy(_mesh);
+                _mesh = null;
+            }
             if (_root != null) Object.Destroy(_root);
             _root = null;
             _model = null;

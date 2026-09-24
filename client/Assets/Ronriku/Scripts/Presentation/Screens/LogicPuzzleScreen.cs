@@ -58,7 +58,7 @@ namespace Ronriku.Presentation.Screens
             int points = TrialScoring.Points(_data.Metadata.Difficulty, solved, elapsedMilliseconds, target, _moves, Par,
                 _resets, OverParPenalty);
             return new TrialOutcome(TrialKind.Logic, _data.Metadata.Difficulty, solved, elapsedMilliseconds, target,
-                _moves, Par, _resets, points);
+                _moves, Par, _resets, points, "[" + string.Join(",", _path) + "]");
         }
 
         /// <summary>Extends the path by one cell if the step is legal. Public for automated tests.</summary>

@@ -34,6 +34,7 @@ namespace Ronriku.Presentation.Shell
         private readonly Func<AppTab, VisualElement> _screenFactory;
 
         public AppTab Current { get; private set; } = AppTab.Play;
+        public bool InFullscreen => _fullscreen.style.display == DisplayStyle.Flex;
         public TopBar TopBar => _topBar;
 
         public AppShell(Func<AppTab, VisualElement> screenFactory, TopBar topBar)

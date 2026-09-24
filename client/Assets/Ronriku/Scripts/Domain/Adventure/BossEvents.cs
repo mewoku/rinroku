@@ -45,7 +45,8 @@ namespace Ronriku.Domain.Adventure
             DateTime day = utcNow.Kind == DateTimeKind.Utc ? utcNow.Date : utcNow.ToUniversalTime().Date;
             int sinceMonday = ((int)day.DayOfWeek + 6) % 7;
             DateTime weekStart = day.AddDays(-sinceMonday);
-            int week = (int)((weekStart - DailyCalendar.Epoch).TotalDays / 7);
+            // Floor, not truncation: the epoch is a Tuesday, so the first week starts before it (week -1).
+            int week = (int)Math.Floor((weekStart - DailyCalendar.Epoch).TotalDays / 7.0);
             long weekSeed = DailyPlan.Mix(unchecked((long)Hashing.Fnv1a("ronriku:boss:v1:" + week)), 0);
             var events = new List<BossEvent>();
             for (int tier = 0; tier < 3; tier++)

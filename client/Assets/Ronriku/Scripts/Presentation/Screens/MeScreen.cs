@@ -3,6 +3,7 @@ using Ronriku.Domain.Adventure;
 using Ronriku.Domain.Figures;
 using Ronriku.Domain.Player;
 using Ronriku.Domain.Shop;
+using Ronriku.Infrastructure.Online;
 using Ronriku.Presentation.Accessibility;
 using Ronriku.Presentation.Components;
 using Ronriku.Presentation.Voxels;
@@ -18,7 +19,7 @@ namespace Ronriku.Presentation.Screens
         private readonly VoxelView _hero;
 
         public MeScreen(PlayerProfile profile, int today, bool hapticsEnabled, Action<bool> setHaptics,
-            Action<OwnedFigure> equip, bool online)
+            Action<OwnedFigure> equip, OnlineService online)
         {
             _profile = profile;
             _equip = equip;
@@ -46,7 +47,7 @@ namespace Ronriku.Presentation.Screens
             var nameLabel = UiFactory.Heading(profile.displayName, 18, RonrikuTheme.Text);
             nameLabel.style.unityTextAlign = TextAnchor.MiddleLeft;
             identity.Add(nameLabel);
-            var sub = UiFactory.Label($"LEVEL {profile.Level}  ·  {(online ? "ONLINE" : "LOCAL PROFILE")}", 11, RonrikuTheme.Muted);
+            var sub = UiFactory.Label($"LEVEL {profile.Level}  ·  {(online != null ? "ONLINE" : "LOCAL PROFILE")}", 11, RonrikuTheme.Muted);
             sub.style.unityTextAlign = TextAnchor.MiddleLeft;
             identity.Add(sub);
             identity.Add(XpBar(profile));
@@ -77,11 +78,10 @@ namespace Ronriku.Presentation.Screens
 
             scroll.Add(Section("FRIENDS & RANKS"));
             var social = UiFactory.Panel(RonrikuTheme.Frost.Accent2);
-            var socialText = UiFactory.Paragraph(online
-                ? "Friends, global and daily leaderboards are synced."
-                : "Add friends by handle, compare ratings and climb the global and daily leaderboards once you connect online.",
-                12, RonrikuTheme.Muted);
-            social.Add(socialText);
+            if (online != null) social.Add(new SocialPanel(online));
+            else social.Add(UiFactory.Paragraph(
+                "Add friends by handle, compare ratings and climb the global and daily leaderboards once you connect online.",
+                12, RonrikuTheme.Muted));
             scroll.Add(social);
 
             scroll.Add(Section("SETTINGS"));

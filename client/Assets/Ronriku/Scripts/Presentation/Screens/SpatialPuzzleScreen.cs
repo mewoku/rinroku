@@ -94,7 +94,8 @@ namespace Ronriku.Presentation.Screens
 
         protected override TrialOutcome CreateOutcome(bool solved, int elapsedMilliseconds) =>
             TrialOutcome.FromSpatial(_data,
-                new SpatialPuzzleScorer().Calculate(_data, solved, elapsedMilliseconds, _moves, _resets));
+                new SpatialPuzzleScorer().Calculate(_data, solved, elapsedMilliseconds, _moves, _resets),
+                "[" + string.Join(",", _path.ConvertAll(m => ((int)m).ToString())) + "]");
 
         private static VisualElement MapColumn(string label, VisualElement grid)
         {

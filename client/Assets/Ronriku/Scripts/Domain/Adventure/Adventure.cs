@@ -135,13 +135,25 @@ namespace Ronriku.Domain.Adventure
             return earned;
         }
 
-        /// <summary>1 star = solved, 2 = at par / no mistakes, 3 = also under the target time.</summary>
-        public static int Stars(TrialOutcome outcome)
+        /// <summary>
+        /// Server-canonical star rule (backend complete_level): 1 = solved, 2 = no Spatial stage over par,
+        /// 3 = also within the summed target time. Only Spatial has a par that affects stars.
+        /// </summary>
+        public static int Stars(TrialOutcome outcome) => BossStars(new[] { outcome });
+
+        public static int BossStars(IReadOnlyList<TrialOutcome> stages)
         {
-            if (!outcome.Solved) return 0;
-            bool clean = outcome.Par <= 0 || outcome.Moves <= outcome.Par;
-            bool fast = outcome.ElapsedMilliseconds <= outcome.TargetMilliseconds;
-            return clean ? (fast ? 3 : 2) : 1;
+            if (stages.Count == 0) return 0;
+            bool clean = true;
+            int elapsed = 0, target = 0;
+            foreach (TrialOutcome o in stages)
+            {
+                if (!o.Solved) return 0;
+                if (o.Kind == TrialKind.Spatial && o.Par > 0 && o.Moves > o.Par) clean = false;
+                elapsed += o.ElapsedMilliseconds;
+                target += o.TargetMilliseconds;
+            }
+            return clean ? (elapsed <= target ? 3 : 2) : 1;
         }
     }
 }

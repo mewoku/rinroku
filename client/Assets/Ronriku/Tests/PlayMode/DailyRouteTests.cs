@@ -24,6 +24,7 @@ namespace Ronriku.Tests
         {
             _profileDir = Path.Combine(Path.GetTempPath(), "ronriku-playmode-" + Guid.NewGuid().ToString("N"));
             RuntimeConfig.ProfileDirectory = _profileDir;
+            RuntimeConfig.OnlineEnabled = false;
             RuntimeConfig.UtcNowOverride = new DateTime(2026, 9, 23, 12, 0, 0, DateTimeKind.Utc);
         }
 

@@ -36,10 +36,16 @@ namespace Ronriku.Domain.Player
         public readonly int Par;
         public readonly int Resets;
         public readonly int Points;
+        /// <summary>
+        /// The player's submitted answer as JSON for server replay: Pattern = option index, Spatial = move
+        /// list, Logic = cell path. Never send it to analytics.
+        /// </summary>
+        public readonly string Answer;
 
         public TrialOutcome(TrialKind kind, PuzzleDifficulty difficulty, bool solved, int elapsedMilliseconds,
-            int targetMilliseconds, int moves, int par, int resets, int points)
+            int targetMilliseconds, int moves, int par, int resets, int points, string answer = null)
         {
+            Answer = answer;
             Kind = kind;
             Difficulty = difficulty;
             Solved = solved;
@@ -51,10 +57,10 @@ namespace Ronriku.Domain.Player
             Points = Math.Max(0, points);
         }
 
-        public static TrialOutcome FromSpatial(SpatialPuzzleData data, SpatialAttemptScore score) => new TrialOutcome(
+        public static TrialOutcome FromSpatial(SpatialPuzzleData data, SpatialAttemptScore score, string answer = null) => new TrialOutcome(
             TrialKind.Spatial, data.Metadata.Difficulty, score.Solved, score.ElapsedMilliseconds,
             SpatialPuzzleScorer.TargetMilliseconds(data.Metadata.Difficulty), score.Moves, score.Par, score.Resets,
-            score.Points);
+            score.Points, answer);
     }
 
     /// <summary>

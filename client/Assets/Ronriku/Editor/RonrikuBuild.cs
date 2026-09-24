@@ -82,6 +82,10 @@ namespace Ronriku.Editor
             PlayerSettings.SplashScreen.show = false;
             PlayerSettings.SplashScreen.showUnityLogo = false;
 
+            // Local development backend is plain HTTP (127.0.0.1 via adb reverse). Production must use HTTPS
+            // and set this back to NotAllowed; see docs/RISKS.md.
+            PlayerSettings.insecureHttpOption = InsecureHttpOption.AlwaysAllowed;
+
             // Size: strip unused engine and managed code; Ronriku.Runtime is preserved by link.xml.
             PlayerSettings.stripEngineCode = true;
             PlayerSettings.SetManagedStrippingLevel(NamedBuildTarget.Android, ManagedStrippingLevel.High);

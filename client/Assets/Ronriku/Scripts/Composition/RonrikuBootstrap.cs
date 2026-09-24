@@ -7,6 +7,7 @@ using Ronriku.Domain.Player;
 using Ronriku.Domain.Puzzles;
 using Ronriku.Domain.Shop;
 using Ronriku.Infrastructure.Analytics;
+using Ronriku.Infrastructure.Online;
 using Ronriku.Infrastructure.Persistence;
 using Ronriku.Presentation.Accessibility;
 using Ronriku.Presentation.Components;
@@ -39,6 +40,7 @@ namespace Ronriku.Composition
         private SpatialPuzzleData _currentPuzzle;
         private PatternPuzzleData _currentPattern;
         private LogicPuzzleData _currentLogic;
+        private OnlineService _online;
 
         private void Awake()
         {
@@ -53,6 +55,47 @@ namespace Ronriku.Composition
             ConfigurePanel();
             BuildRoot();
             _analytics.Track("app_opened", new Dictionary<string, string> { ["environment"] = RuntimeConfig.Environment });
+            if (RuntimeConfig.OnlineEnabled)
+            {
+                _online = OnlineService.CreateFromConfig();
+                if (_online != null) ConnectOnline();
+            }
+        }
+
+        // ---------------------------------------------------------------- online
+
+        private bool Online => _online != null && _online.Connected;
+
+        private async void ConnectOnline()
+        {
+            bool connected = await _online.ConnectAsync(_profile);
+            if (this == null) return;
+            RuntimeConfig.Competitive = connected;
+            if (!connected) return;
+            Save();
+            _shell.TopBar.Refresh();
+            if (!_shell.InFullscreen) _shell.ShowTab(_shell.Current);
+        }
+
+        /// <summary>Runs a server call after a local result; on success re-pulls authoritative state.</summary>
+        private async void Submit(string what, Func<System.Threading.Tasks.Task> call, Action onDone = null)
+        {
+            if (!Online) return;
+            try
+            {
+                await call();
+                await _online.Pull(_profile);
+                if (this == null) return;
+                Save();
+                _shell.TopBar.Refresh();
+                onDone?.Invoke();
+            }
+            catch (Exception e)
+            {
+                string code = e is OnlineException oe ? oe.Code : e.Message;
+                Debug.LogWarning($"RONRIKU online: {what} failed: {code}");
+                if (this != null) Toast.Show(_shell, $"SERVER: {code.ToUpperInvariant()}", RonrikuTheme.Red);
+            }
         }
 
         private void ConfigurePanel()
@@ -126,7 +169,7 @@ namespace Ronriku.Composition
                 case AppTab.Shop:
                     return new ShopScreen(_profile, ShopCatalogue.ForDay(Today), () => DailyCalendar.UntilReset(RuntimeConfig.UtcNow), BuyFigure);
                 case AppTab.Me:
-                    return new MeScreen(_profile, Today, _haptics.Enabled, SetHaptics, EquipFigure, RuntimeConfig.Competitive);
+                    return new MeScreen(_profile, Today, _haptics.Enabled, SetHaptics, EquipFigure, Online ? _online : null);
                 default:
                     return new PlayMapScreen(_profile, ShopCatalogue.Build(_profile.Avatar), PlayLevel, CollectShard);
             }
@@ -165,6 +208,7 @@ namespace Ronriku.Composition
             _profile.avatarFigureId = figure.id;
             Save();
             _shell.TopBar.Refresh();
+            Submit("avatar", () => _online.SetAvatar(figure.id));
         }
 
         private PurchaseResult BuyFigure(ShopItem item)
@@ -172,6 +216,7 @@ namespace Ronriku.Composition
             PurchaseResult result = ShopCatalogue.Buy(_profile, item);
             if (result == PurchaseResult.Ok)
             {
+                Submit("purchase", () => _online.BuyFigure(item.Id));
                 Save();
                 _shell.TopBar.Refresh();
                 _analytics.Track("figure_bought", new Dictionary<string, string> { ["rarity"] = item.Figure.Rarity.ToString(), ["size"] = item.Size.ToString() });
@@ -265,7 +310,13 @@ namespace Ronriku.Composition
         private void FinishDaily()
         {
             DailyResult result = DailyCompletion.Apply(_profile, _session);
-            if (result.Counted) Save();
+            if (result.Counted)
+            {
+                Save();
+                var outcomes = new List<TrialOutcome>(_session.Outcomes);
+                int day = _session.Plan.Day;
+                Submit("daily", () => _online.SubmitDaily(day, outcomes));
+            }
             var props = DailyProps(_session.Plan);
             props["duration_ms"] = result.ElapsedMilliseconds.ToString();
             props["solved"] = result.Solved.ToString();
@@ -284,8 +335,8 @@ namespace Ronriku.Composition
             LevelDef def = LevelDef.For(world, index);
             if (def.IsBoss)
             {
-                PlayBossStages($"W{world + 1} BOSS", def.Monster(), def.BossStages(), 0, 0,
-                    elapsed => FinishWorldBoss(world, index, elapsed), () => FailBoss(def.Monster(), () => PlayLevel(world, index), AppTab.Play));
+                PlayBossStages($"W{world + 1} BOSS", def.Monster(), def.BossStages(), 0, 0, new List<TrialOutcome>(),
+                    (elapsed, answers) => FinishWorldBoss(world, index, elapsed, answers), () => FailBoss(def.Monster(), () => PlayLevel(world, index), AppTab.Play));
                 return;
             }
 
@@ -304,7 +355,11 @@ namespace Ronriku.Composition
                 TrackOutcome(new Dictionary<string, string> { ["world"] = world.ToString(), ["level"] = index.ToString() }, outcome);
                 int stars = AdventureProgress.Stars(outcome);
                 int earned = stars > 0 ? AdventureProgress.Complete(_profile, world, index, stars, outcome.ElapsedMilliseconds) : 0;
-                if (stars > 0) Save();
+                if (stars > 0)
+                {
+                    Save();
+                    Submit("level", () => _online.CompleteLevel(world, index, stars, outcome.ElapsedMilliseconds, new[] { outcome }));
+                }
                 ClearCurrent();
                 _shell.ShowFullscreen(new LevelResultScreen(new LevelResultModel
                 {
@@ -322,7 +377,7 @@ namespace Ronriku.Composition
 
         /// <summary>Runs boss stages one after another; any skipped/failed stage loses the fight.</summary>
         private void PlayBossStages(string title, Figure monster, IReadOnlyList<(TrialKind kind, long seed)> stages, int stage,
-            int elapsedSoFar, Action<int> won, Action lost)
+            int elapsedSoFar, List<TrialOutcome> answers, Action<int, List<TrialOutcome>> won, Action lost)
         {
             var (kind, seed) = stages[stage];
             var context = new TrialScreenContext
@@ -340,19 +395,21 @@ namespace Ronriku.Composition
             {
                 TrackOutcome(new Dictionary<string, string> { ["boss"] = title, ["stage"] = stage.ToString() }, outcome);
                 int elapsed = elapsedSoFar + outcome.ElapsedMilliseconds;
+                answers.Add(outcome);
                 if (!outcome.Solved) lost();
-                else if (stage + 1 < stages.Count) PlayBossStages(title, monster, stages, stage + 1, elapsed, won, lost);
-                else won(elapsed);
+                else if (stage + 1 < stages.Count) PlayBossStages(title, monster, stages, stage + 1, elapsed, answers, won, lost);
+                else won(elapsed, answers);
             };
             ShowTrialScreen(CreateTrial(kind, seed, PuzzleDifficulty.Standard, context), RonrikuTheme.Boss);
         }
 
-        private void FinishWorldBoss(int world, int index, int elapsed)
+        private void FinishWorldBoss(int world, int index, int elapsed, List<TrialOutcome> answers)
         {
             LevelDef def = LevelDef.For(world, index);
-            int stars = elapsed < 150000 ? 3 : elapsed < 240000 ? 2 : 1;
+            int stars = AdventureProgress.BossStars(answers);
             int earned = AdventureProgress.Complete(_profile, world, index, stars, elapsed);
             Save();
+            Submit("world boss", () => _online.CompleteLevel(world, index, stars, elapsed, answers));
             ClearCurrent();
             _shell.ShowFullscreen(new LevelResultScreen(new LevelResultModel
             {
@@ -388,7 +445,7 @@ namespace Ronriku.Composition
 
         // ---------------------------------------------------------------- boss raids
 
-        private void StartBossEvent(BossEvent boss)
+        private async void StartBossEvent(BossEvent boss)
         {
             if (!boss.TryEnter(_profile))
             {
@@ -396,11 +453,23 @@ namespace Ronriku.Composition
                 return;
             }
             Save();
+            string attempt = null;
+            if (Online)
+            {
+                try { attempt = await _online.EnterBoss(boss.Id); }
+                catch (Exception e)
+                {
+                    Debug.LogWarning($"RONRIKU online: boss entry failed: {e.Message}");
+                    Toast.Show(_shell, "SERVER BOSS ENTRY FAILED  ·  PLAYING LOCAL", RonrikuTheme.Red);
+                }
+                if (this == null) return;
+            }
             _analytics.Track("boss_started", new Dictionary<string, string> { ["boss"] = boss.Id });
-            PlayBossStages(boss.Name, boss.Monster, boss.Stages(), 0, 0, elapsed =>
+            PlayBossStages(boss.Name, boss.Monster, boss.Stages(), 0, 0, new List<TrialOutcome>(), (elapsed, answers) =>
             {
                 _profile.shards += boss.Reward;
                 Save();
+                if (attempt != null) Submit("boss", () => _online.FinishBoss(attempt, answers, elapsed));
                 _analytics.Track("boss_completed", new Dictionary<string, string> { ["boss"] = boss.Id, ["duration_ms"] = elapsed.ToString() });
                 ClearCurrent();
                 _shell.ShowFullscreen(new LevelResultScreen(new LevelResultModel

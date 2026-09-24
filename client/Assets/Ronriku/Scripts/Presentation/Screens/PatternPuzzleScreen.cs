@@ -75,7 +75,7 @@ namespace Ronriku.Presentation.Screens
             int moves = _chosen >= 0 ? 1 : 0;
             int points = TrialScoring.Points(_data.Metadata.Difficulty, solved, elapsedMilliseconds, target, moves, 1, 0, 0);
             return new TrialOutcome(TrialKind.Pattern, _data.Metadata.Difficulty, solved, elapsedMilliseconds, target,
-                moves, 0, 0, points);
+                moves, 0, 0, points, _chosen >= 0 ? _chosen.ToString() : null);
         }
 
         private void Choose(int index)

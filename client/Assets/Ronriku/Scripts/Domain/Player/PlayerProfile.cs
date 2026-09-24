@@ -114,8 +114,7 @@ namespace Ronriku.Domain.Player
         /// <summary>Every profile starts with one 4×4 figure derived from its id so the avatar is personal.</summary>
         private void GrantStarterFigure()
         {
-            ulong seed = 1469598103934665603UL;
-            foreach (char c in playerId) seed = unchecked((seed ^ c) * 1099511628211UL);
+            ulong seed = Hashing.Fnv1a(playerId);
             figures.Add(new OwnedFigure { id = "starter", seed = seed.ToString(), size = 4, acquired = "starter" });
             shards = Math.Max(shards, 150);
         }

@@ -35,6 +35,7 @@ namespace Ronriku.Tests
             {
                 string profileDir = Path.Combine(Path.GetTempPath(), "ronriku-capture-" + Guid.NewGuid().ToString("N"));
                 RuntimeConfig.ProfileDirectory = profileDir;
+                RuntimeConfig.OnlineEnabled = false;
                 RuntimeConfig.UtcNowOverride = new DateTime(2026, 9, 23, 16, 41, 7, DateTimeKind.Utc);
                 try
                 {

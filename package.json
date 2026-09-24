@@ -1,0 +1,11 @@
+{
+  "name": "ronriku",
+  "private": true,
+  "packageManager": "pnpm@9.15.4",
+  "scripts": {
+    "build:core": "pnpm --filter @ronriku/core build",
+    "test:core": "pnpm --filter @ronriku/core test",
+    "test:backend": "pnpm --filter @ronriku/backend test",
+    "typecheck": "pnpm -r --if-present typecheck"
+  }
+}

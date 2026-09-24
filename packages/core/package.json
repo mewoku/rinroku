@@ -1,0 +1,37 @@
+{
+  "name": "@ronriku/core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Deterministic RONRIKU domain (RNG, figures, Daily, puzzles, levels) ported from the C# source of truth.",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "source": "./src/index.ts",
+      "import": "./dist/index.js"
+    },
+    "./render": {
+      "types": "./dist/figures/render.d.ts",
+      "source": "./src/figures/render.ts",
+      "import": "./dist/figures/render.js"
+    },
+    "./src/*": "./src/*"
+  },
+  "files": ["dist", "src"],
+  "scripts": {
+    "build": "tsc -p tsconfig.build.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "pngjs": "^7.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/pngjs": "^6.0.5",
+    "typescript": "~5.9.3",
+    "vitest": "^3.2.7"
+  }
+}

@@ -58,29 +58,41 @@ function sb(): SupabaseClient {
   return client;
 }
 
-let reachable: boolean | null = null;
+const REACHABILITY_TTL_MS = 15_000;
+let reachable: { value: boolean; at: number } | null = null;
 let probe: Promise<boolean> | null = null;
 
-/** Checks once per page load whether the Supabase REST API answers. */
+/** Whether the Supabase REST API answers; re-probed every 15 s (not cached for the whole page). */
 export async function backendReachable(): Promise<boolean> {
-  if (reachable !== null) return reachable;
+  if (reachable && Date.now() - reachable.at < REACHABILITY_TTL_MS) return reachable.value;
   const client = getBrowserSupabase();
-  if (!client) return (reachable = false);
+  if (!client) return false;
   probe ??= (async () => {
+    let ok = false;
     try {
       const ctrl = new AbortController();
       const t = setTimeout(() => ctrl.abort(), 2500);
       const { error } = await client.from("profiles").select("id", { head: true }).limit(1).abortSignal(ctrl.signal);
       clearTimeout(t);
-      reachable = !error;
+      ok = !error;
     } catch {
-      reachable = false;
+      ok = false;
     }
-    return reachable;
+    reachable = { value: ok, at: Date.now() };
+    probe = null;
+    return ok;
   })();
   return probe;
 }
 
+function markUnreachable() {
+  reachable = { value: false, at: Date.now() };
+}
+
+/**
+ * Demo data only when the backend is not configured or not reachable. When it *is* reachable and a
+ * call fails, the error surfaces (never silently replaced by demo numbers).
+ */
 async function withFallback<T>(live: (c: SupabaseClient) => Promise<T>, demo: () => T): Promise<Sourced<T>> {
   if (!(await backendReachable())) {
     return { data: demo(), source: "demo", reason: getBrowserSupabase() ? "Backend not reachable" : "Backend not configured" };
@@ -88,7 +100,8 @@ async function withFallback<T>(live: (c: SupabaseClient) => Promise<T>, demo: ()
   try {
     return { data: await live(sb()), source: "live" };
   } catch (e) {
-    return { data: demo(), source: "demo", reason: e instanceof Error ? e.message : "Backend error" };
+    if (e instanceof TypeError) markUnreachable(); // network failure: next call re-probes
+    throw e;
   }
 }
 
@@ -170,11 +183,9 @@ export async function fetchMyProfile(): Promise<Profile | null> {
   if (!uid) return null;
   const c = sb();
   // ensure_profile() creates the row on first sign-in and returns the owner's full row (incl. shards, wallet).
-  const ensured = await c.rpc("ensure_profile");
-  let row: Row | null = null;
-  if (!ensured.error && ensured.data) row = (Array.isArray(ensured.data) ? ensured.data[0] : ensured.data) as Row;
-  row ??= check(await c.from("profiles").select(PUBLIC_PROFILE_COLS).eq("id", uid).maybeSingle()) as Row | null;
-  if (!row) return null;
+  const ensured = check(await c.rpc("ensure_profile")) as Row | Row[] | null; // failures surface (M7)
+  const row = (Array.isArray(ensured) ? ensured[0] : ensured) ?? null;
+  if (!row) throw new Error("ensure_profile returned no profile.");
   const enc = await encodingsFor(c, [str(row.avatar_figure_id)]);
   return mapProfile(row, enc.get(String(row.avatar_figure_id)) ?? null);
 }
@@ -250,7 +261,7 @@ export async function fetchShelf(day: number = dayNumber()): Promise<Sourced<She
   return withFallback(
     async (c) => {
       const rows = check(await c.from("shop_shelf").select("day,slot,item_id,seed,tier,rarity,name,encoding,price_shards,price_lamports").eq("day", day).order("slot")) as Row[];
-      if (!rows.length) return shelfForDay(day);
+      if (!rows.length) return []; // not published yet — the UI says so (no locally computed stand-in)
       return rows.map((r) => ({
         id: String(r.item_id),
         slot: num(r.slot),
@@ -261,6 +272,7 @@ export async function fetchShelf(day: number = dayNumber()): Promise<Sourced<She
         rarity: String(r.rarity) as Rarity,
         encoding: String(r.encoding),
         priceShards: r.price_shards == null ? null : num(r.price_shards),
+        priceLamports: r.price_lamports == null ? null : num(r.price_lamports),
       }));
     },
     () => shelfForDay(day),
@@ -342,11 +354,11 @@ export async function fetchLeaderboard(scope: LeaderboardScope, limit = 50): Pro
       const rows = (check(await c.rpc(fn, args)) as Row[]) ?? [];
       const enc = await encodingsFor(c, rows.map((r) => str(r.avatar_figure_id)));
       return rows.map((r, i) => ({
-        // Rows arrive ordered; the RPC currently returns rank=1 for every row, so derive it from position.
-        rank: i + 1,
+        // Server rank; ties share a rank (the RPC is authoritative).
+        rank: num(r.rank, i + 1),
+        userId: String(r.user_id ?? `${i}`),
         handle: str(r.handle) ?? "—",
-        rating: num(r.rating),
-        score: num(r.score ?? r.points ?? r.rating),
+        score: num(r.score),
         elapsedMs: r.elapsed_ms == null ? null : num(r.elapsed_ms),
         avatarEncoding: str(r.avatar_encoding) ?? enc.get(String(r.avatar_figure_id)) ?? null,
       }));

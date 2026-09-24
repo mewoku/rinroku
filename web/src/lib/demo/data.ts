@@ -85,8 +85,8 @@ export function demoLeaderboard(scope: LeaderboardScope): LeaderboardRow[] {
     const fig = demoFigures[(i * 3 + offset) % demoFigures.length]!;
     return {
       rank: i + 1,
+      userId: `demo-${handle}`,
       handle,
-      rating: 1680 - i * 41 - offset * 3,
       score: scope === "boss" ? 0 : scope === "daily" ? 300 - i * 17 : 1680 - i * 41 - offset * 3,
       elapsedMs: scope === "boss" ? 94_000 + i * 7_300 : null,
       avatarEncoding: fig.encoding,

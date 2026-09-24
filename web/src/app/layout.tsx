@@ -3,6 +3,8 @@ import { Pixelify_Sans, Silkscreen } from "next/font/google";
 import "./globals.css";
 import { Providers } from "@/components/Providers";
 import { BottomNav, SiteHeader } from "@/components/layout/Nav";
+import { PendingPurchases } from "@/components/wallet/PendingPurchases";
+import { headers } from "next/headers";
 import { publicEnv } from "@/lib/env";
 
 const silkscreen = Silkscreen({ subsets: ["latin"], weight: ["400", "700"], variable: "--font-silkscreen", display: "swap" });
@@ -23,7 +25,10 @@ export const viewport: Viewport = {
   viewportFit: "cover",
 };
 
-export default function RootLayout({ children }: { children: React.ReactNode }) {
+export default async function RootLayout({ children }: { children: React.ReactNode }) {
+  // Reading the request headers makes every page render per request, so Next can stamp the CSP
+  // nonce set by middleware.ts onto its scripts (no script 'unsafe-inline').
+  await headers();
   return (
     <html lang="en" className={`${silkscreen.variable} ${pixelify.variable}`}>
       <body>
@@ -32,6 +37,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         </a>
         <Providers>
           <SiteHeader />
+          <PendingPurchases />
           <div id="content">{children}</div>
           <BottomNav />
         </Providers>

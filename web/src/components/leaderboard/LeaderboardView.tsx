@@ -63,9 +63,9 @@ export function LeaderboardView({ scopes = ["global", "daily", "friends", "boss"
               <span>{SCORE_LABEL[scope]}</span>
             </li>
             {state.value.data.map((r) => {
-              const me = profile?.handle && r.handle.toLowerCase() === profile.handle.toLowerCase();
+              const me = profile?.id === r.userId;
               return (
-                <li key={`${r.rank}-${r.handle}`}>
+                <li key={r.userId}>
                   <Link
                     href={`/u/${encodeURIComponent(r.handle)}`}
                     className="px-panel grid min-h-14 grid-cols-[40px_40px_1fr_auto] items-center gap-3 px-3 py-2 hover:brightness-125"
@@ -98,7 +98,7 @@ function Podium({ rows, scope }: { rows: LeaderboardRow[]; scope: LeaderboardSco
     <div className="grid grid-cols-3 items-end gap-2 pt-4 sm:gap-4" aria-hidden="true">
       {order.map((r, i) =>
         r ? (
-          <div key={r.handle} className="flex flex-col items-center gap-1">
+          <div key={r.userId} className="flex flex-col items-center gap-1">
             {r.avatarEncoding && <VoxelViewer encoding={r.avatarEncoding} size={i === 1 ? 112 : 88} resolution={i === 1 ? 40 : 32} interactive={false} phase={i} label="" />}
             <span className="max-w-full truncate text-[13px]">@{r.handle}</span>
             <span className="tabular font-pixel text-[12px] text-accent">

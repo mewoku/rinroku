@@ -1,26 +1,9 @@
 import path from "node:path";
 import type { NextConfig } from "next";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://127.0.0.1:54321";
-const rpcUrl = process.env.NEXT_PUBLIC_SOLANA_RPC_URL ?? "https://api.devnet.solana.com";
-const wsUrl = rpcUrl.replace(/^http/, "ws");
-const isDev = process.env.NODE_ENV !== "production";
-
-// CSP: Unity WebGL needs 'unsafe-eval' + 'wasm-unsafe-eval' and blob: workers; Next needs inline
-// bootstrap scripts. Everything else is same-origin plus Supabase + Solana RPC.
-const csp = [
-  "default-src 'self'",
-  `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' 'unsafe-eval' blob:`,
-  "style-src 'self' 'unsafe-inline'",
-  "img-src 'self' data: blob:",
-  "font-src 'self' data:",
-  `connect-src 'self' blob: data: ${supabaseUrl} ${supabaseUrl.replace(/^http/, "ws")} ${rpcUrl} ${wsUrl} https://*.solana.com wss://*.solana.com${isDev ? " ws://localhost:*" : ""}`,
-  "worker-src 'self' blob:",
-  "frame-ancestors 'none'",
-  "base-uri 'self'",
-  "form-action 'self'",
-  "object-src 'none'",
-].join("; ");
+// Page CSP (nonce-based, /play-only eval) is set per request in src/middleware.ts (src/lib/csp.ts).
+// API responses and static assets get a locked-down policy here.
+const apiCsp = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'";
 
 const nextConfig: NextConfig = {
   // Monorepo root (pnpm workspace) — avoids Next guessing from stray lockfiles in the home dir.
@@ -35,13 +18,13 @@ const nextConfig: NextConfig = {
       {
         source: "/:path*",
         headers: [
-          { key: "Content-Security-Policy", value: csp },
           { key: "X-Content-Type-Options", value: "nosniff" },
           { key: "Referrer-Policy", value: "strict-origin-when-cross-origin" },
           { key: "X-Frame-Options", value: "DENY" },
           { key: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()" },
         ],
       },
+      { source: "/api/:path*", headers: [{ key: "Content-Security-Policy", value: apiCsp }] },
       // Unity pre-compressed builds (Compression Format = Brotli/Gzip without decompression fallback).
       {
         source: "/unity/Build/:file*.wasm.br",

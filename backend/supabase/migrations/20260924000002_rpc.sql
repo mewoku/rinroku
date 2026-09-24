@@ -461,8 +461,11 @@ begin
   return v_attempt;
 end $$;
 
--- Service role only (sol-purchase route, after verifying the devnet transfer). Idempotent: returns
--- the open attempt if one exists (the signature is then not recorded again).
+-- Service role only (sol-purchase route, after verifying the devnet transfer). The attempt and the
+-- ledger row carrying the payment signature are written in this one transaction, so a paid signature
+-- is either fully consumed (attempt + ledger) or not at all. Never silently reuses an open attempt:
+-- raises attempt_open so the route can record the payment as refund_due instead of losing it.
+-- The route pre-checks the same conditions before the player pays.
 create or replace function public.enter_boss_sol(p_user uuid, p_boss_id uuid, p_signature text, p_lamports bigint)
 returns public.boss_attempts
 language plpgsql security definer set search_path = public as $$
@@ -476,8 +479,9 @@ begin
   perform public._require_keys('boss:' || v_boss.id, jsonb_array_length(v_boss.stages));
   perform public._lock_profile(p_user);
 
+  if exists (select 1 from public.transactions where signature = p_signature) then raise exception 'signature_used'; end if;
   select * into v_attempt from public.boss_attempts where boss_id = p_boss_id and user_id = p_user and result = 'open';
-  if v_attempt.id is not null then return v_attempt; end if;
+  if v_attempt.id is not null then raise exception 'attempt_open'; end if;
   insert into public.boss_attempts (boss_id, user_id, paid_with) values (p_boss_id, p_user, 'sol') returning * into v_attempt;
   begin
     perform public._ledger(p_user, 'boss_entry', 0, v_attempt.id::text, null, p_lamports, p_signature);

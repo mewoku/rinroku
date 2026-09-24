@@ -10,29 +10,32 @@ interface SessionState {
   online: boolean;
   userId: string | null;
   profile: Profile | null;
+  /** Set when the backend is reachable but loading the profile failed (M7). */
+  error: string | null;
   refresh: () => Promise<void>;
 }
 
-const Ctx = createContext<SessionState>({ ready: false, online: false, userId: null, profile: null, refresh: async () => {} });
+const Ctx = createContext<SessionState>({ ready: false, online: false, userId: null, profile: null, error: null, refresh: async () => {} });
 
 export function useSession() {
   return useContext(Ctx);
 }
 
 export function SessionProvider({ children }: { children: ReactNode }) {
-  const [state, setState] = useState<Omit<SessionState, "refresh">>({ ready: false, online: false, userId: null, profile: null });
+  const [state, setState] = useState<Omit<SessionState, "refresh">>({ ready: false, online: false, userId: null, profile: null, error: null });
 
   const refresh = useCallback(async () => {
     const online = await backendReachable();
     const client = getBrowserSupabase();
     const userId = online && client ? ((await client.auth.getSession()).data.session?.user.id ?? null) : null;
     let profile: Profile | null = null;
+    let error: string | null = null;
     try {
       profile = userId ? await fetchMyProfile() : null;
-    } catch {
-      profile = null;
+    } catch (e) {
+      error = e instanceof Error ? e.message : "Could not load your profile.";
     }
-    setState({ ready: true, online, userId, profile });
+    setState({ ready: true, online, userId, profile, error });
   }, []);
 
   useEffect(() => {

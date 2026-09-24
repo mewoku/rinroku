@@ -56,9 +56,10 @@ export interface Listing {
 export type LeaderboardScope = "global" | "daily" | "friends" | "boss";
 
 export interface LeaderboardRow {
+  /** Server rank — ties share a rank. */
   rank: number;
+  userId: string;
   handle: string;
-  rating: number;
   score: number;
   /** Boss scope: fastest winning time (lower is better). */
   elapsedMs: number | null;

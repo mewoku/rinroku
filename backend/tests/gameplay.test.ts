@@ -235,7 +235,7 @@ describe("bosses", () => {
     }
   });
 
-  it("enter_boss_sol (service role) validates payment and is idempotent", async () => {
+  it("enter_boss_sol (service role) validates payment, records the signature atomically and never reuses an open attempt", async () => {
     const p = await newPlayer();
     const sig = "5".repeat(64) + Date.now();
     expect(await rpcError(admin, "enter_boss_sol", { p_user: p.id, p_boss_id: SEED_BOSS, p_signature: sig, p_lamports: null })).toMatch(/underpaid/);
@@ -245,8 +245,18 @@ describe("bosses", () => {
     })).toMatch(/profile_missing/);
     const a = await rpc(admin, "enter_boss_sol", { p_user: p.id, p_boss_id: SEED_BOSS, p_signature: sig, p_lamports: 10_000_000 });
     expect(a).toMatchObject({ paid_with: "sol", result: "open" });
-    const b = await rpc(admin, "enter_boss_sol", { p_user: p.id, p_boss_id: SEED_BOSS, p_signature: sig + "x", p_lamports: 10_000_000 });
-    expect(b.id).toBe(a.id);
+    // Ledger row for the signature exists, tied to the attempt.
+    const { data: led } = await admin.from("transactions").select("user_id, kind, ref_id, lamports").eq("signature", sig).single();
+    expect(led).toMatchObject({ user_id: p.id, kind: "boss_entry", ref_id: a.id, lamports: 10_000_000 });
+    // A second paid entry while the attempt is open is refused (route records it as refund_due).
+    expect(await rpcError(admin, "enter_boss_sol", { p_user: p.id, p_boss_id: SEED_BOSS, p_signature: sig + "x", p_lamports: 10_000_000 })).toMatch(/attempt_open/);
+    const { count } = await admin.from("transactions").select("id", { count: "exact", head: true }).eq("signature", sig + "x");
+    expect(count).toBe(0);
+    // The same signature can never open another attempt, even for another player.
+    const q = await newPlayer();
+    expect(await rpcError(admin, "enter_boss_sol", { p_user: q.id, p_boss_id: SEED_BOSS, p_signature: sig, p_lamports: 10_000_000 })).toMatch(/signature_used/);
+    const { count: open } = await admin.from("boss_attempts").select("id", { count: "exact", head: true }).eq("user_id", q.id);
+    expect(open).toBe(0);
     expect(await shards(p.id)).toBe(150);
   });
 

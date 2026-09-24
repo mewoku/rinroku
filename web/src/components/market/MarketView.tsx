@@ -13,7 +13,7 @@ import { WalletConnect } from "../wallet/WalletConnect";
 import { useSolPurchase } from "../wallet/useSolPurchase";
 import { useSession } from "../SessionProvider";
 import { BackendUnavailableError, buyFigureWithShards, buyListing, fetchListings, fetchShelf, type ListingFilters } from "@/lib/api";
-import { formatPrice, formatShards, formatSol, solPriceLamports } from "@/lib/economy";
+import { formatPrice, formatShards, formatSol } from "@/lib/economy";
 import { useAsync } from "@/lib/hooks";
 import type { ShelfItem } from "@/lib/shelf";
 import { RARITIES, TIERS, type Currency, type FigureRecord, type Listing, type Rarity, type Tier } from "@/lib/types";
@@ -55,7 +55,6 @@ function DailyShelf() {
   const toast = useToast();
   const { purchase, busy, connected } = useSolPurchase();
   const { refresh, profile, userId } = useSession();
-  const legendaryLamports = solPriceLamports("figure-legendary")!;
   const offline = state.status === "ready" && state.value.source === "demo";
   const shelf = state.status === "ready" ? state.value.data : [];
 
@@ -105,7 +104,7 @@ function DailyShelf() {
     }
     return connected ? (
       <PixelButton size="sm" palette="boss" onClick={() => buySol(s)} disabled={busy || pending !== null || offline}>
-        {pending === s.id ? "Confirm…" : `${formatSol(legendaryLamports)} SOL`}
+        {pending === s.id ? "Confirm…" : `${formatSol(s.priceLamports ?? 0)} SOL`}
       </PixelButton>
     ) : (
       <WalletConnect size="sm" variant="primary" />
@@ -126,6 +125,10 @@ function DailyShelf() {
         {offline && <DemoBadge reason="Server offline — shelf computed locally, not buyable" />}
       </div>
       {state.status === "loading" && <GridSkeleton n={6} />}
+      {state.status === "error" && <p className="px-panel p-6 text-center text-danger">{state.error}</p>}
+      {state.status === "ready" && !offline && shelf.length === 0 && (
+        <p className="px-panel p-6 text-center text-muted">Today&apos;s shelf isn&apos;t published yet. Check back in a moment.</p>
+      )}
       <ul className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
         {shelf.map((s, i) => (
           <li key={s.id}>

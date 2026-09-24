@@ -5,6 +5,8 @@ import type { Rarity, Tier } from "./types";
 export const SHELF_SIZE = 6;
 const SIZES: Tier[] = [3, 3, 4, 4, 5, 5];
 const SHOP_STREAM = 0x53484f50n; // "SHOP"
+/** Display-only fallback (PLAN §6); the server quote is authoritative. */
+const LEGENDARY_LAMPORTS = 100_000_000;
 
 export interface ShelfItem {
   id: string; // fig-{seed}-{size}, same as the Unity client
@@ -18,6 +20,8 @@ export interface ShelfItem {
   encoding: string;
   /** Shards, or null when SOL-only (Legendary). */
   priceShards: number | null;
+  /** Devnet lamports for SOL-only items (server shop_shelf.price_lamports when live). */
+  priceLamports: number | null;
 }
 
 export function shelfFigure(day: number, slot: number): { seed: bigint; tier: Tier; figure: Figure } {
@@ -42,6 +46,7 @@ export function shelfForDay(day: number = dayNumber()): ShelfItem[] {
       rarity: figure.rarity,
       encoding: figure.encode(),
       priceShards: price < 0 ? null : price,
+      priceLamports: price < 0 ? LEGENDARY_LAMPORTS : null,
     };
   });
 }

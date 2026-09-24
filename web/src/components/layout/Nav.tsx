@@ -34,7 +34,7 @@ export function Logo({ size = 20 }: { size?: number }) {
 
 export function SiteHeader() {
   const path = usePathname();
-  const { profile, online, ready } = useSession();
+  const { profile, online, ready, error } = useSession();
   return (
     <header className="sticky top-0 z-40 border-b-2 border-line bg-[rgb(7_8_11/0.82)] backdrop-blur-[6px]">
       <div className="mx-auto flex h-16 max-w-[1200px] items-center gap-4 px-4">
@@ -63,7 +63,12 @@ export function SiteHeader() {
               <span className="tabular">{formatShards(profile.shards)}</span>
             </Link>
           )}
-          {ready && !profile && (
+          {ready && error && (
+            <span role="alert" title={error} className="font-pixel text-[10px] text-danger">
+              PROFILE ERROR
+            </span>
+          )}
+          {ready && !profile && !error && (
             <Link href="/login" className="font-pixel text-[12px] uppercase text-muted hover:text-text">
               {online ? "Sign in" : "Guest"}
             </Link>

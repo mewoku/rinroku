@@ -59,6 +59,9 @@ namespace Ronriku.Editor
             BuildReport report = BuildPipeline.BuildPlayer(options);
             if (report.summary.result != BuildResult.Succeeded)
                 throw new BuildFailedException($"WebGL build failed: {report.summary.result}");
+            // BuildPipeline can report success when the platform module is unavailable; trust the files.
+            if (!File.Exists(Path.Combine(output, "Build", "unity.loader.js")))
+                throw new BuildFailedException("WebGL build produced no loader (is the WebGL module loaded? restart the editor)");
             Debug.Log($"RONRIKU_WEBGL_BUILD_OK path={output} bytes={report.summary.totalSize}");
         }
 

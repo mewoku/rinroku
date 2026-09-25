@@ -327,7 +327,7 @@ namespace Ronriku.Domain.Arcade
         private static Challenge Arrows(ref DeterministicRandom rng, long seed, int tier)
         {
             int minSteps = tier > 0 ? 6 : 4;
-            for (int attempt = 0; attempt < 400; attempt++)
+            for (int attempt = 0; attempt < 3000; attempt++)
             {
                 var dirs = new int[ArrowSize * ArrowSize];
                 for (int i = 0; i < dirs.Length; i++) dirs[i] = rng.NextInt(4);

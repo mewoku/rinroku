@@ -39,6 +39,10 @@ namespace Ronriku.Presentation.Arcade
         protected readonly Palette Palette;
         private readonly VisualElement _hero;
         private Vector2 _heroCell;
+        private readonly VisualElement _dynamic;
+
+        /// <summary>Repaints moving things only (floor and walls are cached on their own layer).</summary>
+        public void Refresh() => _dynamic.MarkDirtyRepaint();
 
         public SwipeInput Input { get; }
 
@@ -49,7 +53,16 @@ namespace Ronriku.Presentation.Arcade
             Palette = palette;
             name = "board";
             style.flexGrow = 1;
-            generateVisualContent += ctx => DrawBoard(ctx.painter2D);
+            var floor = new VisualElement { pickingMode = PickingMode.Ignore, name = "floor" };
+            floor.style.position = Position.Absolute;
+            floor.style.left = floor.style.right = floor.style.top = floor.style.bottom = 0;
+            floor.generateVisualContent += ctx => DrawStatic(ctx.painter2D);
+            Add(floor);
+            _dynamic = new VisualElement { pickingMode = PickingMode.Ignore, name = "things" };
+            _dynamic.style.position = Position.Absolute;
+            _dynamic.style.left = _dynamic.style.right = _dynamic.style.top = _dynamic.style.bottom = 0;
+            _dynamic.generateVisualContent += ctx => DrawBoard(ctx.painter2D);
+            Add(_dynamic);
             _hero = new VisualElement { pickingMode = PickingMode.Ignore, name = "hero" };
             _hero.style.position = Position.Absolute;
             if (hero != null)
@@ -113,6 +126,8 @@ namespace Ronriku.Presentation.Arcade
             }).Every(16);
         }
 
+        protected abstract void DrawStatic(Painter2D p);
+
         protected void DrawFloor(Painter2D p, Func<int, bool> isWall)
         {
             float c = Cell;
@@ -148,7 +163,10 @@ namespace Ronriku.Presentation.Arcade
             PlaceHero(state.Pos);
         }
 
-        protected override void DrawBoard(Painter2D p)
+        /// <summary>Gems as the player currently sees them (updated per animated cell, not per swipe).</summary>
+        public int ShownGems;
+
+        protected override void DrawStatic(Painter2D p)
         {
             var level = _state.Level;
             DrawFloor(p, i => level.Tiles[i] == DashTile.Wall);
@@ -160,11 +178,17 @@ namespace Ronriku.Presentation.Arcade
                     for (int k = 0; k < 3; k++)
                         Glyphs.Poly(p, RonrikuTheme.Red, tl + new Vector2(c * (0.1f + k * 0.28f), c * 0.85f), tl + new Vector2(c * (0.24f + k * 0.28f), c * 0.25f), tl + new Vector2(c * (0.38f + k * 0.28f), c * 0.85f));
             }
-            bool open = _state.ExitOpen;
+        }
+
+        protected override void DrawBoard(Painter2D p)
+        {
+            var level = _state.Level;
+            float c = Cell;
+            bool open = ShownGems == level.AllGems;
             Sprites.Draw(p, Sprites.Door, CellTopLeft(level.Exit) + Vector2.one * c * 0.12f, c * 0.76f, open ? RonrikuTheme.Gold : RonrikuTheme.BlueGrey);
             for (int g = 0; g < level.Gems.Length; g++)
             {
-                if ((_state.Gems & (1 << g)) != 0) continue;
+                if ((ShownGems & (1 << g)) != 0) continue;
                 float bob = MotionSettings.ReducedMotion ? 0 : Mathf.Sin(Time.realtimeSinceStartup * 4f + g) * c * 0.05f;
                 Sprites.Draw(p, Sprites.Gem, CellTopLeft(level.Gems[g]) + new Vector2(c * 0.18f, c * 0.14f + bob), c * 0.64f, Glyphs.TokenColors[(g + 1) % Glyphs.TokenColors.Length]);
             }
@@ -200,7 +224,11 @@ namespace Ronriku.Presentation.Arcade
             style.paddingTop = 6;
             style.paddingBottom = 12;
 
-            Add(ArcadeChrome.TopBar(title, back, out _, extra: _moves = UiFactory.Heading(string.Empty, 12, RonrikuTheme.Text)));
+            Add(ArcadeChrome.TopBar(title, () =>
+            {
+                if (_result != null) CompleteNow();
+                else back();
+            }, out _, extra: _moves = UiFactory.Heading(string.Empty, 12, RonrikuTheme.Text)));
             var hint = UiFactory.Heading("SWIPE: SLIDE TILL YOU HIT A WALL. GRAB ALL GEMS, THEN THE DOOR", 10, palette.Accent);
             hint.style.whiteSpace = WhiteSpace.Normal;
             hint.style.flexShrink = 0;
@@ -210,7 +238,7 @@ namespace Ronriku.Presentation.Arcade
             _board = new DashBoard(_state, palette, hero);
             _board.Input.Swiped += Move;
             Add(_board);
-            _board.schedule.Execute(_board.MarkDirtyRepaint).Every(100);
+            _board.schedule.Execute(_board.Refresh).Every(100);
 
             var controls = UiFactory.Row();
             controls.style.flexShrink = 0;
@@ -258,15 +286,17 @@ namespace Ronriku.Presentation.Arcade
             {
                 if (slide.Collected.Contains(cell))
                 {
+                    _board.ShownGems |= 1 << System.Array.IndexOf(_state.Level.Gems, cell);
                     Feedback.Coin();
                     Juice.Popup(_overlay, _overlay.WorldToLocal(_board.LocalToWorld(_board.CellCenter(cell))), "+GEM", RonrikuTheme.Gold, 16, 40f, 0.6f);
-                    _board.MarkDirtyRepaint();
-                    if (_state.ExitOpen || slide.Gems == _state.Level.AllGems) Juice.Flash(_board, RonrikuTheme.WithAlpha(RonrikuTheme.Gold, 0.2f), 0.3f);
+                    _board.Refresh();
+                    if (_board.ShownGems == _state.Level.AllGems) Juice.Flash(_board, RonrikuTheme.WithAlpha(RonrikuTheme.Gold, 0.2f), 0.3f);
                 }
             }, () =>
             {
                 _moving = false;
-                _board.MarkDirtyRepaint();
+                _board.ShownGems = _state.Gems;
+                _board.Refresh();
                 if (slide.Dead)
                 {
                     Feedback.Hit();
@@ -287,7 +317,8 @@ namespace Ronriku.Presentation.Arcade
             if (_moving || _finished) return;
             _state.Restart();
             _board.PlaceHero(_state.Pos);
-            _board.MarkDirtyRepaint();
+            _board.ShownGems = _state.Gems;
+            _board.Refresh();
             UpdateMoves();
             Feedback.Whoosh();
         }
@@ -297,7 +328,7 @@ namespace Ronriku.Presentation.Arcade
             _finished = true;
             var sb = new StringBuilder("D1:");
             foreach (int d in _state.Log) sb.Append(d < 0 ? 'r' : (char)('0' + d));
-            var result = new ArcadeResult
+            var result = _result = new ArcadeResult
             {
                 Won = true,
                 Stars = _state.Stars,
@@ -306,7 +337,17 @@ namespace Ronriku.Presentation.Arcade
                 Proof = sb.ToString()
             };
             Feedback.Win();
-            Juice.Banner(_overlay, _state.Stars == 3 ? "PERFECT!" : "CLEAR!", RonrikuTheme.Gold, 1.1f, () => _completed(result));
+            Juice.Banner(_overlay, _state.Stars == 3 ? "PERFECT!" : "CLEAR!", RonrikuTheme.Gold, 1.1f, CompleteNow);
+        }
+
+        private ArcadeResult _result;
+        private bool _reported;
+
+        private void CompleteNow()
+        {
+            if (_reported || _result == null) return;
+            _reported = true;
+            _completed(_result);
         }
     }
 
@@ -323,10 +364,15 @@ namespace Ronriku.Presentation.Arcade
             PlaceHero(state.Hero);
         }
 
-        protected override void DrawBoard(Painter2D p)
+        protected override void DrawStatic(Painter2D p)
         {
             var level = _state.Level;
             DrawFloor(p, i => level.Walls[i]);
+        }
+
+        protected override void DrawBoard(Painter2D p)
+        {
+            var level = _state.Level;
             float c = Cell;
             Sprites.Draw(p, Sprites.Stairs, CellTopLeft(level.Stairs) + Vector2.one * c * 0.12f, c * 0.76f,
                 _state.StairsOpen ? RonrikuTheme.Gold : RonrikuTheme.WithAlpha(RonrikuTheme.BlueGrey, 0.5f));
@@ -398,7 +444,11 @@ namespace Ronriku.Presentation.Arcade
 
             _hearts = new HeartsRow(CrawlState.MaxHearts);
             _hearts.Set(_state.Hearts);
-            Add(ArcadeChrome.TopBar(title, back, out _, extra: _hearts));
+            Add(ArcadeChrome.TopBar(title, () =>
+            {
+                if (_result != null) CompleteNow();
+                else back();
+            }, out _, extra: _hearts));
             var hint = UiFactory.Heading("MOVE ON THE BEAT. BUMP MONSTERS. ARROWS SHOW THEIR NEXT STEP", 10, palette.Accent);
             hint.style.whiteSpace = WhiteSpace.Normal;
             hint.style.flexShrink = 0;
@@ -447,8 +497,10 @@ namespace Ronriku.Presentation.Arcade
 
             _startedAt = Time.realtimeSinceStartup;
             schedule.Execute(Tick).Every(16);
+            _lastFrame = Time.realtimeSinceStartup;
             RegisterCallback<AttachToPanelEvent>(_ => Juice.Banner(_overlay, "READY?", palette.Accent, 1.2f, () =>
             {
+                _musicClock = Music.IsPlaying && Music.Current == MusicTrack.HeroRun;
                 _started = true;
                 _lastBeat = Mathf.FloorToInt((float)Beats());
             }));
@@ -457,12 +509,25 @@ namespace Ronriku.Presentation.Arcade
         /// <summary>Continuous game-beat position: music clock when the hero track plays, otherwise a steady timer.</summary>
         private double Beats()
         {
-            if (Music.IsPlaying && Music.Current == MusicTrack.HeroRun) return Music.SongBeats / MusicBeatsPerMove;
-            return (Time.realtimeSinceStartup - _startedAt) / FallbackSecondsPerMove;
+            if (_musicClock) return Music.SongBeats / MusicBeatsPerMove;
+            return _fallbackBeats;
         }
+
+        /// <summary>
+        /// The clock source is picked once, when READY ends: the music clock if HeroRun is audible, else a
+        /// steady timer that only advances while the app runs (pauses cannot fast-forward monsters).
+        /// Switching sources mid-level would jump the beat, so it never happens.
+        /// </summary>
+        private bool _musicClock;
+        private double _fallbackBeats;
+        private float _lastFrame;
 
         private void Tick()
         {
+            float now = Time.realtimeSinceStartup;
+            float dt = Mathf.Min(now - _lastFrame, 0.1f);
+            _lastFrame = now;
+            if (_started && !_finished) _fallbackBeats += dt / FallbackSecondsPerMove;
             double beats = Beats();
             float phase = (float)(beats - Math.Floor(beats));
             float pulse = Mathf.Clamp01(1f - phase * 3f);
@@ -470,9 +535,10 @@ namespace Ronriku.Presentation.Arcade
             _beatCore.style.scale = new Scale(Vector3.one * (1f + pulse * 0.6f));
             _beatCore.style.backgroundColor = Color.Lerp(_palette.Accent, Color.white, pulse * 0.6f);
             _beatBar.MarkDirtyRepaint();
-            _board.MarkDirtyRepaint();
+            _board.Refresh();
             if (!_started || _finished) return;
             int beat = Mathf.FloorToInt((float)beats);
+            if (beat - _lastBeat > 1) _lastBeat = beat - 1; // never replay a backlog of beats at once
             while (_lastBeat < beat)
             {
                 _lastBeat++;
@@ -592,7 +658,7 @@ namespace Ronriku.Presentation.Arcade
         {
             if (_finished) return;
             _finished = true;
-            var result = new ArcadeResult
+            var result = _result = new ArcadeResult
             {
                 Won = _state.Won,
                 Stars = _state.Stars,
@@ -604,13 +670,23 @@ namespace Ronriku.Presentation.Arcade
             if (_state.Won)
             {
                 Feedback.Win();
-                Juice.Banner(_overlay, "CLEAR!", RonrikuTheme.Gold, 1.1f, () => _completed(result));
+                Juice.Banner(_overlay, "CLEAR!", RonrikuTheme.Gold, 1.1f, CompleteNow);
             }
             else
             {
                 Feedback.Lose();
-                Juice.Banner(_overlay, "DEFEATED", RonrikuTheme.Red, 1.2f, () => _completed(result));
+                Juice.Banner(_overlay, "DEFEATED", RonrikuTheme.Red, 1.2f, CompleteNow);
             }
+        }
+
+        private ArcadeResult _result;
+        private bool _reported;
+
+        private void CompleteNow()
+        {
+            if (_reported || _result == null) return;
+            _reported = true;
+            _completed(_result);
         }
     }
 

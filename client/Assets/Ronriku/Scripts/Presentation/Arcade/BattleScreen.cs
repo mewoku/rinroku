@@ -41,6 +41,8 @@ namespace Ronriku.Presentation.Arcade
         private bool _active;
         private bool _finished;
         private int _totalDamage;
+        private ArcadeResult _result;
+        private bool _reported;
 
         public BattleState State => _state;
 
@@ -59,7 +61,12 @@ namespace Ronriku.Presentation.Arcade
             var top = UiFactory.Row();
             top.style.height = 48;
             top.style.flexShrink = 0;
-            var backButton = UiFactory.FlatButton(string.Empty, back);
+            // BACK after the fight is decided still records the result (never throw a win away).
+            var backButton = UiFactory.FlatButton(string.Empty, () =>
+            {
+                if (_state.Over) { Finish(); CompleteNow(); }
+                else back();
+            });
             backButton.name = "back-button";
             backButton.style.width = 44;
             backButton.style.height = 40;
@@ -158,7 +165,8 @@ namespace Ronriku.Presentation.Arcade
         private void Tick()
         {
             float now = Time.realtimeSinceStartup;
-            float dt = (now - _lastTick) * 1000f;
+            // Clamp: after an app pause the realtime clock jumps; never let that land a swing.
+            float dt = Mathf.Min((now - _lastTick) * 1000f, 100f);
             _lastTick = now;
             if (!_active || _finished || _showingSince >= 0) return;
             _swingMs += dt;
@@ -256,7 +264,7 @@ namespace Ronriku.Presentation.Arcade
             if (_finished) return;
             _finished = true;
             _active = false;
-            var result = new ArcadeResult
+            var result = _result = new ArcadeResult
             {
                 Won = _state.Won,
                 Stars = _state.Stars,
@@ -269,13 +277,20 @@ namespace Ronriku.Presentation.Arcade
             {
                 _arena.MonsterDies(_palette);
                 Feedback.Win();
-                Juice.Banner(_overlay, "VICTORY", RonrikuTheme.Gold, 1.2f, () => _completed(result));
+                Juice.Banner(_overlay, "VICTORY", RonrikuTheme.Gold, 1.2f, CompleteNow);
             }
             else
             {
                 Feedback.Lose();
-                Juice.Banner(_overlay, "DEFEATED", RonrikuTheme.Red, 1.2f, () => _completed(result));
+                Juice.Banner(_overlay, "DEFEATED", RonrikuTheme.Red, 1.2f, CompleteNow);
             }
+        }
+
+        private void CompleteNow()
+        {
+            if (_reported || _result == null) return;
+            _reported = true;
+            _completed(_result);
         }
 
         public static string Proof(BattleState state)

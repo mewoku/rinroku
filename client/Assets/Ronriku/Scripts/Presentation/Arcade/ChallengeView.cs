@@ -240,7 +240,12 @@ namespace Ronriku.Presentation.Arcade
             int picked = Challenges.PopCount(_selection);
             _sumLabel.text = $"PICKED {sum}";
             _sumLabel.style.color = sum == _challenge.Target ? RonrikuTheme.Teal : sum > _challenge.Target ? RonrikuTheme.Red : RonrikuTheme.Muted;
-            if (picked == _challenge.Pick || sum > _challenge.Target + 9) Submit(_selection);
+            // Short grace period so a mis-tap can be undone before the answer locks in.
+            if (picked == _challenge.Pick)
+            {
+                int snapshot = _selection;
+                schedule.Execute(() => { if (_selection == snapshot) Submit(_selection); }).StartingIn(380);
+            }
         }
 
         // ------------------------------------------------------------------ Memory
@@ -486,7 +491,7 @@ namespace Ronriku.Presentation.Arcade
                 return;
             }
             for (int i = 0; i < _right.Length; i++)
-                DrawShape(p, _right[i], new Vector2(mid + 26 + r + i * step * (_right.Length > 4 ? 0.8f : 1f), cy), _right[i] == 0 ? r * 0.6f : r);
+                DrawShape(p, _right[i], new Vector2(mid + 26 + r + i * step * (_right.Length > 4 ? 0.8f : 1f), cy), r);
         }
 
         private static void DrawShape(Painter2D p, int shape, Vector2 c, float r) =>

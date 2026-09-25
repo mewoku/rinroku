@@ -98,6 +98,8 @@ namespace Ronriku.Presentation.Arcade
         private readonly List<CardElement> _cards = new List<CardElement>();
         private bool _busy;
         private bool _finished;
+        private ArcadeResult _result;
+        private bool _reported;
 
         public CardsState State => _state;
         /// <summary>True while a played hand is being scored.</summary>
@@ -118,7 +120,11 @@ namespace Ronriku.Presentation.Arcade
             var top = UiFactory.Row();
             top.style.height = 48;
             top.style.flexShrink = 0;
-            var backButton = UiFactory.FlatButton(string.Empty, back);
+            var backButton = UiFactory.FlatButton(string.Empty, () =>
+            {
+                if (_state.Over) { Finish(); CompleteNow(); }
+                else back();
+            });
             backButton.name = "back-button";
             backButton.style.width = 44;
             backButton.style.height = 40;
@@ -414,7 +420,7 @@ namespace Ronriku.Presentation.Arcade
         {
             if (_finished) return;
             _finished = true;
-            var result = new ArcadeResult
+            var result = _result = new ArcadeResult
             {
                 Won = _state.Won,
                 Stars = _state.Stars,
@@ -426,14 +432,21 @@ namespace Ronriku.Presentation.Arcade
             {
                 _arena.MonsterDies(_palette);
                 Feedback.Win();
-                Juice.Banner(_overlay, "VICTORY", RonrikuTheme.Gold, 1.2f, () => _completed(result));
+                Juice.Banner(_overlay, "VICTORY", RonrikuTheme.Gold, 1.2f, CompleteNow);
             }
             else
             {
                 Feedback.Lose();
                 _arena.MonsterAttack();
-                Juice.Banner(_overlay, "OUT OF HANDS", RonrikuTheme.Red, 1.3f, () => _completed(result));
+                Juice.Banner(_overlay, "OUT OF HANDS", RonrikuTheme.Red, 1.3f, CompleteNow);
             }
+        }
+
+        private void CompleteNow()
+        {
+            if (_reported || _result == null) return;
+            _reported = true;
+            _completed(_result);
         }
     }
 
@@ -441,6 +454,7 @@ namespace Ronriku.Presentation.Arcade
     public sealed class CharmPickScreen : VisualElement
     {
         private readonly List<CharmId> _picked = new List<CharmId>();
+        private bool _committed;
 
         public CharmPickScreen(CharmId[] offer, int picks, Palette palette, string title, Action back, Action<CharmId[]> done)
         {
@@ -493,12 +507,15 @@ namespace Ronriku.Presentation.Arcade
                 UiFactory.Pressable(card);
                 card.clicked += () =>
                 {
-                    if (_picked.Contains(charm)) return;
+                    if (_committed || _picked.Contains(charm)) return;
                     _picked.Add(charm);
                     UiFactory.SetBorder(card, 3, RonrikuTheme.Teal);
                     Juice.Punch(card, 0.08f);
                     Feedback.Success();
-                    if (_picked.Count >= picks) schedule.Execute(() => done(_picked.ToArray())).StartingIn(250);
+                    if (_picked.Count < picks) return;
+                    _committed = true;
+                    CharmId[] chosen = _picked.ToArray();
+                    schedule.Execute(() => done(chosen)).StartingIn(250);
                 };
                 Add(card);
                 Juice.SlideIn(card, 420f + i * 80f, 0.3f + i * 0.06f);

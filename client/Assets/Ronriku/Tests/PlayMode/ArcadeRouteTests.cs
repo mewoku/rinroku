@@ -81,7 +81,7 @@ namespace Ronriku.Tests
                         if ((c.Answer & (1 << i)) != 0) Click(view.Q<Button>($"tile-{i}"));
                     break;
                 case ChallengeKind.Memory:
-                    yield return WaitFor(() => view.Q<Button>("cell-0").enabledSelf, 5f, "memory unlock");
+                    yield return WaitFor(() => view.Q<Button>("cell-0")?.enabledSelf ?? true, 5f, "memory unlock");
                     for (int i = 0; i < 16; i++)
                         if ((c.Answer & (1 << i)) != 0) Click(view.Q<Button>($"cell-{i}"));
                     break;
@@ -111,7 +111,9 @@ namespace Ronriku.Tests
                 yield return WaitFor(() => root.Q<ChallengeView>() is { } v && v.Challenge == battle.State.Current || battle.State.Over, 5f, "next challenge");
                 if (battle.State.Over) break;
                 seen.Add(battle.State.Current.Kind);
+                int index = battle.State.Index;
                 yield return Answer(root, battle.State.Current);
+                yield return WaitFor(() => battle.State.Index > index || battle.State.Over, 5f, "answer judged");
             }
             Assert.That(battle.State.Won, Is.True);
             Assert.That(seen.Count, Is.GreaterThanOrEqualTo(2), "a fight mixes challenge kinds");

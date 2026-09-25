@@ -337,6 +337,7 @@ namespace Ronriku.Presentation.Arcade
         private int _max;
         private float _shown;
         private float _target;
+        private readonly IVisualElementScheduledItem _drain;
 
         public HpBar(int max, Color color, string prefix = "HP")
         {
@@ -364,10 +365,11 @@ namespace Ronriku.Presentation.Arcade
             _text.style.unityTextOutlineWidth = 1f;
             Add(_text);
             Set(max, true);
-            schedule.Execute(() =>
+            _drain = schedule.Execute(() =>
             {
                 _shown = Mathf.MoveTowards(_shown, _target, 0.012f);
                 _ghost.style.width = Length.Percent(_shown * 100f);
+                if (Mathf.Approximately(_shown, _target)) _drain.Pause();
             }).Every(16);
         }
 
@@ -377,6 +379,7 @@ namespace Ronriku.Presentation.Arcade
             _fill.style.width = Length.Percent(_target * 100f);
             if (instant) _shown = _target;
             _text.text = $"{_prefix} {Mathf.Max(0, value)}";
+            _drain?.Resume();
         }
     }
 

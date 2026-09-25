@@ -58,7 +58,7 @@ describe("complete_arcade_level", () => {
     // Level 1 is also a battle; level 2 (dash) is locked until level 1 is cleared.
     expect(await rpcError(p.db, "complete_arcade_level", { ...battle, p_level: 2, p_mode: "dash", p_proof: "D1:0123" })).toMatch(/level_locked/);
     expect(await rpcError(p.db, "complete_arcade_level", { ...battle, p_level: 1, p_mode: "cards" })).toMatch(/wrong_mode/);
-    expect(await rpcError(p.db, "complete_arcade_level", { ...battle, p_level: 1, p_elapsed_ms: 500 })).toMatch(/implausible_time/);
+    expect(await rpcError(p.db, "complete_arcade_level", { ...battle, p_level: 1, p_elapsed_ms: 900 })).toMatch(/implausible_time/);
     expect(await rpcError(p.db, "complete_arcade_level", { ...battle, p_level: 1, p_proof: "C1:x" })).toMatch(/invalid_proof/);
     expect(await rpcError(p.db, "complete_arcade_level", { ...battle, p_level: 1, p_stars: 4 })).toMatch(/invalid_stars/);
     expect(await rpc(p.db, "complete_arcade_level", { ...battle, p_level: 1, p_stars: 1 })).toMatchObject({ earned: 20 });

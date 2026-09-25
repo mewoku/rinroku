@@ -26,11 +26,26 @@ namespace Ronriku.Infrastructure.Online
         public string url;
         public string anonKey;
         public int timeoutSeconds = 6;
+        /// <summary>
+        /// Backend for the WebGL build. "same-origin" = the page's own origin (the site proxies the
+        /// Supabase API paths, see deploy/Caddyfile), so the browser never needs a cross-origin call.
+        /// </summary>
+        public string webUrl = "same-origin";
 
         public static OnlineConfig Load()
         {
             var asset = Resources.Load<TextAsset>("ronriku-online");
-            return asset == null ? null : JsonUtility.FromJson<OnlineConfig>(asset.text);
+            if (asset == null) return null;
+            var config = JsonUtility.FromJson<OnlineConfig>(asset.text);
+            if (Application.platform == RuntimePlatform.WebGLPlayer && !string.IsNullOrEmpty(config.webUrl))
+                config.url = config.webUrl == "same-origin" ? Origin(Application.absoluteURL) ?? config.url : config.webUrl;
+            return config;
+        }
+
+        private static string Origin(string url)
+        {
+            if (!Uri.TryCreate(url, UriKind.Absolute, out var uri)) return null;
+            return uri.GetLeftPart(UriPartial.Authority);
         }
     }
 

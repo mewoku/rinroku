@@ -1,6 +1,17 @@
 # Current State
 
-Updated: 2026-09-24. Plan and contracts: `docs/PLAN_V2.md`.
+Updated: 2026-09-26. Plan and contracts: `docs/PLAN_V2.md` (platform) and `docs/PLAN_V3.md` (arcade adventure, music).
+
+## v3 summary (arcade adventure)
+
+| Area | Status |
+|---|---|
+| Adventure | Each world: Battle ×4, Rune Hand ×3 (Balatro-style), Ice Dash ×2, Beat Crawl ×2, Boss (battle → rune hand). 7 battle micro-challenges. Flat middle difficulty; Rune Hand balanced by bot simulation (~68 % greedy win) |
+| Music | Procedural chiptune: 9 tracks × 3 intensity layers, stingers, beat clock (Crawl syncs to it). Toggle in ME |
+| Pattern (Daily) | Examples act out their rule (rotate/flip/slide/invert) |
+| Tuning | `Resources/RonrikuTuning.asset` — Inspector knobs, linked from the RONRIKU object |
+| Server | `complete_arcade_level` (layout, unlock, physical time floors, proof stored); arcade proofs not yet replay-verified |
+| Tests | EditMode 50, PlayMode 6 (+Capture 2, Online 1), backend 38 |
 
 ## v2 summary
 
@@ -16,8 +27,8 @@ Updated: 2026-09-24. Plan and contracts: `docs/PLAN_V2.md`.
 ## Unity client
 
 - **Design**: dp layout (432×960 reference), OFL pixel fonts (Silkscreen, Pixelify Sans), dithered ambient backgrounds per palette, glowing gradient buttons, pixel icons, pixelated 3D voxel renderer (RenderTexture, point-filtered), synthesized chiptune SFX, haptics, gravity-sensor parallax, custom boot sequence (Unity splash disabled).
-- **Tabs**: PLAY (5 worlds × 12 levels, walking avatar, guardian monsters with HP, stars, world bosses as 3 stages, floating shard pickups capped 10/day), DAILY (Pattern → Shadow → Link), BOSSES (weekly raids, shard entry, first win pays), SHOP (daily shelf of 6 voxel figures), ME (avatar, stats, collection/equip, social when online, settings).
-- **Difficulty**: every adventure level and Daily trial uses the Standard band.
+- **Tabs**: PLAY (5 worlds × 12 arcade levels — see PLAN_V3, walking avatar, guardian monsters, stars, world bosses, floating shard pickups capped 10/day), DAILY (Pattern → Shadow → Link), BOSSES (weekly raids, shard entry, first win pays), SHOP (daily shelf of 6 voxel figures), ME (avatar, stats, collection/equip, social when online, settings).
+- **Difficulty**: Daily trials use the Standard band; arcade levels use tier 0 for W1 L1–6 and tier 1 elsewhere (no per-world ramp).
 - **Online**: `Infrastructure/Online` — anonymous Supabase session over UnityWebRequest, offline-first; when connected the server is authoritative (shards, rating, streak, figures, levels) and results are submitted as answers + move/reset counts for server replay.
 - **Tests**: EditMode 35, PlayMode 3 (offline), Online 1 (end-to-end vs local Supabase), Capture (screenshots at 3 aspect ratios → `docs/evidence/`).
 - **Builds**: `RONRIKU/Build Android (Release)` → `Builds/Android/RONRIKU.apk` (~16 MB); `(Development)` → `RONRIKU-dev.apk`; `RONRIKU/Build WebGL (Website)` → `web/public/unity/`.
@@ -38,11 +49,13 @@ Updated: 2026-09-24. Plan and contracts: `docs/PLAN_V2.md`.
 ## Verified on device (Pixel 6a)
 
 - v1.x flows (Daily, trials by tap/swipe/drag, persistence, release build 16 MB, cold start ~0.2–0.3 s).
-- **v2 not yet hands-on on device**: the phone was locked during the v2 build; next device pass pending.
+- **v2/v3 not yet hands-on on device**: the v3 release APK is installed (2026-09-26), but the phone was locked in bedtime mode; next device pass pending.
 
 ## Open items
 
-1. Device pass of v2 on Pixel 6a (adb reverse tcp:54321 for online).
+1. Device pass of v3 on Pixel 6a (adb reverse tcp:54321 for online): feel, music on the speaker, Crawl beat timing, frame rate on boards.
+1b. Port the arcade rules to `packages/core` and replay-verify arcade proofs on the server (today: layout, unlock, time floors, stored proof).
+1c. WebGL: verify music layers start (`PlayScheduled`/`timeSamples`) after the first tap.
 2. Live devnet mint: fund the dry-run buyer printed by `pnpm --filter web devnet-dry-run` at faucet.solana.com and rerun it (the mint authority itself needs no SOL).
 3. Seeker Mobile Wallet Adapter inside the Unity app (web already supports MWA).
 4. Offline progress made before first connecting is not migrated to the server.

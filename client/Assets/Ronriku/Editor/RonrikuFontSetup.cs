@@ -15,9 +15,8 @@ namespace Ronriku.Editor
         private const string SourceDir = "Assets/Ronriku/Fonts";
         private const string TargetDir = "Assets/Ronriku/Resources/Fonts";
 
-        /// <summary>Every character the UI uses: printable ASCII plus the few symbols in labels.</summary>
-        public const string Charset =
-            " !\"#$%&'()*+,-./0123456789:;<=>?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz{|}~×·→…★";
+        // Atlases stay Dynamic and empty in git: Unity 6 advanced text rejects Static font assets and
+        // clears dynamic glyph data after play mode, so pre-populating them would only churn.
 
         [MenuItem("RONRIKU/Setup Fonts")]
         public static void Setup()
@@ -26,24 +25,9 @@ namespace Ronriku.Editor
             Create("Silkscreen-Regular.ttf", "Silkscreen");
             Create("Silkscreen-Bold.ttf", "SilkscreenBold");
             Create("PixelifySans.ttf", "PixelifySans");
-            foreach (string name in new[] { "Silkscreen", "SilkscreenBold", "PixelifySans" }) Freeze($"{TargetDir}/{name}.asset");
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
             Debug.Log("RONRIKU_FONTS_OK");
-        }
-
-        /// <summary>
-        /// Pre-populates the charset so play mode never adds glyphs and rewrites the asset (churn in git).
-        /// Stays Dynamic: Unity 6's advanced text system refuses Static font assets.
-        /// </summary>
-        private static void Freeze(string path)
-        {
-            var asset = AssetDatabase.LoadAssetAtPath<FontAsset>(path);
-            if (asset == null) return;
-            asset.atlasPopulationMode = AtlasPopulationMode.Dynamic;
-            asset.TryAddCharacters(Charset, out string missing);
-            if (!string.IsNullOrEmpty(missing)) Debug.Log($"RONRIKU fonts: {asset.name} lacks '{missing}' (fallback used)");
-            EditorUtility.SetDirty(asset);
         }
 
         private static void Create(string file, string assetName)

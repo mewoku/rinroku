@@ -1,0 +1,22 @@
+# Build context is the repo root; send only what the web image needs.
+# Never send env files (secrets) or the Unity project.
+**/node_modules
+**/.next
+**/dist
+**/.env
+**/.env.*
+!**/.env.example
+**/*.tsbuildinfo
+.git
+client
+Builds
+artifacts
+docs
+scripts
+deploy
+backend/supabase
+backend/tests
+backend/scripts
+packages/core/fixtures
+packages/core/test
+web/public/unity

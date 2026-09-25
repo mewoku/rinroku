@@ -27,6 +27,14 @@ describe("CSP (M6)", () => {
     expect(directive(buildCsp({ ...base, unity: false }), "frame-src")).toContain("https://connect.solflare.com");
   });
 
+  it("same-origin Supabase (behind deploy/ Caddy): connect-src relies on 'self', no stray host", () => {
+    const c = directive(buildCsp({ ...base, supabaseUrl: "same-origin", unity: false }), "connect-src");
+    expect(c.startsWith("connect-src 'self' https://api.devnet.solana.com")).toBe(true);
+    expect(c).not.toContain("same-origin");
+    expect(c).not.toContain("127.0.0.1");
+    expect(directive(buildCsp({ ...base, unity: false }), "connect-src")).toContain("ws://127.0.0.1:54321");
+  });
+
   it("middleware scopes eval to /play and passes a fresh nonce", () => {
     const home = middleware(new NextRequest("http://localhost/market")).headers.get("content-security-policy")!;
     const play = middleware(new NextRequest("http://localhost/play")).headers.get("content-security-policy")!;

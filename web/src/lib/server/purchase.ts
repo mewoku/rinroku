@@ -1,18 +1,26 @@
 /**
  * Devnet SOL purchase flow, independent of Supabase / Solana so it can be unit tested with an
- * in-memory store and a fake chain (see purchase.test.ts). The Supabase + Umi bindings live in
- * purchaseStore.ts / mint.ts.
+ * in-memory store and a fake chain (see purchase.test.ts). The Supabase + Solana bindings live in
+ * purchaseStore.ts / mint.ts; the transaction layout is documented in lib/solana/purchaseTx.ts.
+ *
+ * Flow: prepare (server checks everything, builds ONE transaction: payment → recipient + memo +
+ * Core create, partially signs it) → the buyer's wallet signs, pays all fees/rent and broadcasts →
+ * process (server verifies the landed transaction and records ownership).
  *
  * Invariants:
- *  - The buyer is the caller's *linked* wallet (profiles.wallet_address), never a request field.
- *  - A payment signature is consumed exactly once, bound to (user, kind, ref, lamports). A retry with
- *    the same signature may only resume delivery of that same thing.
- *  - A verified payment that cannot be fulfilled is recorded as `sol_refund_due` (never left
- *    claimable, never silently dropped).
- *  - Minting uses a deterministic asset address per figure, reserved in the DB before sending, so a
- *    figure can never be minted twice (Core `create` fails if the asset account already exists).
+ *  - The buyer is the caller's *linked* wallet (profiles.wallet_address), never a request field; it
+ *    is baked into the prepared transaction as fee payer and cannot be changed without voiding the
+ *    server's signature.
+ *  - Price comes from the server. The memo, signed by the server mint authority, binds a transaction
+ *    to exactly one (user, kind, ref); a payment signature is consumed exactly once in the ledger, and
+ *    a retry with the same signature may only resume delivery of that same thing.
+ *  - Payment and mint are one atomic transaction: "paid but not minted" cannot happen. Each figure
+ *    has a deterministic asset address, so it can be created on-chain at most once.
+ *  - A verified boss payment that cannot be fulfilled is recorded as `sol_refund_due`.
+ *  - The mint authority never pays: the buyer is fee payer and Core rent payer.
  */
 import { MINT_FEE_LAMPORTS } from "../economy";
+import type { PurchaseTxCheck, PurchaseTxExpectation } from "../solana/purchaseTx";
 
 export type PurchaseItem = "figure-legendary" | "mint-fee" | "boss-entry";
 
@@ -77,9 +85,12 @@ export interface PurchaseStore {
   insertClaim(signature: string, claim: Claim): Promise<"ok" | "duplicate">;
   shelfSlot(day: number, slot: number): Promise<ShelfSlot | null>;
   findOwnedFigure(userId: string, seed: string, tier: number): Promise<FigureRow | null>;
-  insertFigure(row: { userId: string; seed: string; tier: number; encoding: string; rarity: string; name: string }): Promise<FigureRow>;
+  /** Insert with a caller-chosen id; returns the existing row if that id is already present. */
+  insertFigure(row: { id: string; userId: string; seed: string; tier: number; encoding: string; rarity: string; name: string }): Promise<FigureRow>;
   figure(id: string): Promise<FigureRow | null>;
   hasActiveListing(figureId: string): Promise<boolean>;
+  /** Minted figures cannot carry shard listings (list_figure invariant): cancel any that slipped in. */
+  cancelActiveListings(figureId: string): Promise<void>;
   boss(id: string): Promise<BossRow | null>;
   bossKeysPublished(bossId: string, stages: number): Promise<boolean>;
   hasOpenAttempt(userId: string, bossId: string): Promise<boolean>;
@@ -90,17 +101,27 @@ export interface PurchaseStore {
   reserveMint(figureId: string, address: string): Promise<boolean>;
 }
 
-export type TransferCheck = { ok: true; lamports: number } | { ok: false; reason: string };
+export interface MintSpec {
+  figureId: string;
+  name: string;
+  uri: string;
+}
 
 export interface ChainDeps {
-  verifyTransfer(signature: string, expected: { buyer: string; treasury: string; minLamports: number }): Promise<TransferCheck>;
+  /** Server mint authority public key (co-signs every prepared transaction; holds no SOL). */
+  authority: string;
   assetAddress(figureId: string): string;
+  legendaryFigureId(userId: string, day: number, slot: number): string;
+  memo(userId: string, kind: string, ref: string): string;
   assetExists(address: string): Promise<boolean>;
-  mint(params: { figureId: string; owner: string; name: string; uri: string }): Promise<string>;
+  /** Build + partially sign the purchase transaction. `transaction` is base64 wire format. */
+  buildTx(p: { buyer: string; recipient: string; lamports: number; memo: string; mint?: MintSpec }): Promise<{ transaction: string; lastValidBlockHeight: number }>;
+  verifyTx(signature: string, expected: PurchaseTxExpectation): Promise<PurchaseTxCheck>;
 }
 
 export interface PurchaseConfig {
-  treasury: string;
+  /** Public payment recipient (NEXT_PUBLIC_PAYMENT_RECIPIENT). */
+  recipient: string;
   siteUrl: string;
   today: number;
   now: Date;
@@ -124,6 +145,16 @@ export interface Quote {
   buyer: string;
 }
 
+export interface Prepared {
+  transaction: string;
+  lastValidBlockHeight: number;
+  lamports: number;
+  wallet: string;
+  recipient: string;
+  figureId: string | null;
+  assetAddress: string | null;
+}
+
 export interface PurchaseOutcome {
   figureId: string | null;
   mintAddress: string | null;
@@ -142,10 +173,10 @@ export function refFor(req: PurchaseRequest): string {
   }
 }
 
-/**
- * Everything that can be checked before any SOL moves. Used by the client (GET quote) before it
- * builds the transfer, and again by the server after verification.
- */
+const nftName = (name: string, figureId: string) => `${name} #${figureId.slice(0, 8)}`.slice(0, 32);
+const metadataUri = (cfg: PurchaseConfig, figureId: string) => `${cfg.siteUrl}/api/figures/${figureId}/metadata`;
+
+/** Everything that can be checked before any SOL moves (time-sensitive checks included). */
 export async function quote(store: PurchaseStore, cfg: PurchaseConfig, userId: string, req: PurchaseRequest): Promise<Quote> {
   const buyer = await store.linkedWallet(userId);
   if (!buyer) throw new PurchaseError("wallet_not_linked", "Link your wallet to your profile before paying with SOL.", 409);
@@ -178,45 +209,88 @@ export async function quote(store: PurchaseStore, cfg: PurchaseConfig, userId: s
   return { ...base, lamports: boss.entryLamports };
 }
 
+/**
+ * Pre-checks, then builds the single partially-signed transaction for the buyer to sign and send.
+ * Self-heals when the figure's deterministic asset already exists on-chain (a landed purchase whose
+ * verification request never arrived): ownership is recorded and the caller is told it is done.
+ */
+export async function prepareSolPurchase(store: PurchaseStore, chain: ChainDeps, cfg: PurchaseConfig, userId: string, req: PurchaseRequest): Promise<Prepared> {
+  const q = await quote(store, cfg, userId, req);
+  const memo = chain.memo(userId, q.kind, q.ref);
+  let mint: MintSpec | undefined;
+
+  if (req.item === "figure-legendary") {
+    const slot = (await store.shelfSlot(req.day!, req.slot!))!;
+    const figureId = chain.legendaryFigureId(userId, req.day!, req.slot!);
+    if (await store.figure(figureId)) throw new PurchaseError("already_owned", "You already bought this Legendary.", 409);
+    const address = chain.assetAddress(figureId);
+    if (await chain.assetExists(address)) {
+      const fig = await store.insertFigure({ id: figureId, userId, seed: slot.seed, tier: slot.tier, encoding: slot.encoding, rarity: slot.rarity, name: slot.name });
+      await store.reserveMint(fig.id, address);
+      throw new PurchaseError("already_owned", "You already bought this Legendary — it is in your inventory.", 409);
+    }
+    mint = { figureId, name: nftName(slot.name, figureId), uri: metadataUri(cfg, figureId) };
+  } else if (req.item === "mint-fee") {
+    const fig = (await store.figure(req.figureId!))!;
+    const address = chain.assetAddress(fig.id);
+    if (await chain.assetExists(address)) {
+      await store.reserveMint(fig.id, address);
+      throw new PurchaseError("already_minted", "This figure is already minted.", 409);
+    }
+    mint = { figureId: fig.id, name: nftName(fig.name, fig.id), uri: metadataUri(cfg, fig.id) };
+  }
+
+  const built = await chain.buildTx({ buyer: q.buyer, recipient: cfg.recipient, lamports: q.lamports, memo, mint });
+  return {
+    ...built,
+    lamports: q.lamports,
+    wallet: q.buyer,
+    recipient: cfg.recipient,
+    figureId: mint?.figureId ?? null,
+    assetAddress: mint ? chain.assetAddress(mint.figureId) : null,
+  };
+}
+
 async function recordRefundDue(store: PurchaseStore, signature: string, userId: string, kind: string, ref: string, lamports: number, reason: string): Promise<never> {
   const r = await store.insertClaim(signature, { userId, kind: REFUND_KIND, refId: `${kind}|${ref}`, lamports });
   if (r === "duplicate") throw new PurchaseError("signature_used", "This payment was already used.", 409);
   throw new PurchaseError("refund_due", `${reason} Your payment was recorded for a refund (signature ${signature.slice(0, 8)}…).`, 409);
 }
 
-export async function processSolPurchase(
-  store: PurchaseStore,
-  chain: ChainDeps,
-  cfg: PurchaseConfig,
-  userId: string,
-  body: PurchaseBody,
-): Promise<PurchaseOutcome> {
+/** Price and asset the prepared transaction must show. No time-sensitive checks: those ran at prepare. */
+async function expectationFor(store: PurchaseStore, chain: ChainDeps, userId: string, body: PurchaseBody): Promise<{ lamports: number; asset: string | null }> {
+  if (body.item === "figure-legendary") {
+    const slot = await store.shelfSlot(body.day!, body.slot!);
+    if (!slot) throw new PurchaseError("shelf_not_published", "Shelf data missing — retry later with the same payment.", 503);
+    if (!slot.priceLamports) throw new PurchaseError("not_sol_item", "That shelf item is not sold for SOL.", 400);
+    return { lamports: slot.priceLamports, asset: chain.assetAddress(chain.legendaryFigureId(userId, body.day!, body.slot!)) };
+  }
+  if (body.item === "mint-fee") return { lamports: MINT_FEE_LAMPORTS, asset: chain.assetAddress(body.figureId!) };
+  const boss = await store.boss(body.bossId!);
+  if (!boss) throw new PurchaseError("unknown_boss", "Unknown boss event.", 404);
+  return { lamports: boss.entryLamports, asset: null };
+}
+
+export async function processSolPurchase(store: PurchaseStore, chain: ChainDeps, cfg: PurchaseConfig, userId: string, body: PurchaseBody): Promise<PurchaseOutcome> {
   const kind = KIND[body.item];
   const ref = refFor(body);
 
   // 1) Earlier claim for this signature? It may only resume exactly what it paid for.
   const prior = await store.claimBySignature(body.signature);
-  if (prior) return resume(store, chain, cfg, userId, body, prior);
+  if (prior) return resume(store, chain, userId, body, prior);
 
-  // 2) Pre-checks (the client ran them too, before paying).
-  let q: Quote;
-  try {
-    q = await quote(store, cfg, userId, body);
-  } catch (e) {
-    if (!(e instanceof PurchaseError) || e.code === "wallet_not_linked") throw e;
-    // Conditions changed after the client's pre-check. If a real payment from the linked wallet
-    // exists, record it for refund; otherwise just report the error.
-    const buyer = await store.linkedWallet(userId);
-    const paid = buyer ? await chain.verifyTransfer(body.signature, { buyer, treasury: cfg.treasury, minLamports: 1 }) : null;
-    if (paid?.ok) return recordRefundDue(store, body.signature, userId, kind, ref, paid.lamports, e.message);
-    throw e;
-  }
-
-  // 3) Verify the on-chain payment from the linked wallet.
-  const check = await chain.verifyTransfer(body.signature, { buyer: q.buyer, treasury: cfg.treasury, minLamports: q.lamports });
+  // 2) Verify the landed transaction is the one this server prepared for (user, kind, ref).
+  const exp = await expectationFor(store, chain, userId, body);
+  const check = await chain.verifyTx(body.signature, {
+    memo: chain.memo(userId, kind, ref),
+    recipient: cfg.recipient,
+    authority: chain.authority,
+    minLamports: exp.lamports,
+    asset: exp.asset,
+  });
   if (!check.ok) throw new PurchaseError("payment_invalid", check.reason, 402);
 
-  // 4) Claim.
+  // 3) Claim.
   if (body.item === "boss-entry") {
     const r = await store.enterBossSol(userId, body.bossId!, body.signature, check.lamports);
     if (r.ok) return { figureId: null, mintAddress: null, attemptId: r.attemptId, resumed: false };
@@ -227,14 +301,14 @@ export async function processSolPurchase(
   if (ins === "duplicate") {
     const raced = await store.claimBySignature(body.signature);
     if (!raced) throw new PurchaseError("claim_failed", "Could not record payment — retry.", 503);
-    return resume(store, chain, cfg, userId, body, raced);
+    return resume(store, chain, userId, body, raced);
   }
 
-  // 5) Deliver.
-  return deliver(store, chain, cfg, userId, body, q.buyer, false);
+  // 4) Record ownership of what the transaction already minted.
+  return deliver(store, chain, userId, body, false);
 }
 
-async function resume(store: PurchaseStore, chain: ChainDeps, cfg: PurchaseConfig, userId: string, body: PurchaseBody, prior: Claim): Promise<PurchaseOutcome> {
+async function resume(store: PurchaseStore, chain: ChainDeps, userId: string, body: PurchaseBody, prior: Claim): Promise<PurchaseOutcome> {
   if (prior.userId !== userId) throw new PurchaseError("signature_used", "This payment was already claimed.", 409);
   if (prior.kind === REFUND_KIND) throw new PurchaseError("refund_due", "This payment is recorded for a refund.", 409);
   if (body.item === "boss-entry") {
@@ -244,47 +318,29 @@ async function resume(store: PurchaseStore, chain: ChainDeps, cfg: PurchaseConfi
     return { figureId: null, mintAddress: null, attemptId: att.id, resumed: true };
   }
   if (prior.kind !== KIND[body.item] || prior.refId !== refFor(body)) throw new PurchaseError("claim_mismatch", "This payment was for a different item.", 409);
-  const buyer = await store.linkedWallet(userId);
-  if (!buyer) throw new PurchaseError("wallet_not_linked", "Link your wallet to resume this purchase.", 409);
-  return deliver(store, chain, cfg, userId, body, buyer, true);
+  return deliver(store, chain, userId, body, true);
 }
 
-async function deliver(store: PurchaseStore, chain: ChainDeps, cfg: PurchaseConfig, userId: string, body: PurchaseBody, buyer: string, resumed: boolean): Promise<PurchaseOutcome> {
+async function deliver(store: PurchaseStore, chain: ChainDeps, userId: string, body: PurchaseBody, resumed: boolean): Promise<PurchaseOutcome> {
   let fig: FigureRow | null;
   if (body.item === "figure-legendary") {
     const slot = await store.shelfSlot(body.day!, body.slot!);
     if (!slot) throw new PurchaseError("shelf_not_published", "Shelf data missing — retry later with the same payment.", 503);
-    fig =
-      (await store.findOwnedFigure(userId, slot.seed, slot.tier)) ??
-      (await store.insertFigure({ userId, seed: slot.seed, tier: slot.tier, encoding: slot.encoding, rarity: slot.rarity, name: slot.name }));
+    const id = chain.legendaryFigureId(userId, body.day!, body.slot!);
+    fig = (await store.figure(id)) ?? (await store.insertFigure({ id, userId, seed: slot.seed, tier: slot.tier, encoding: slot.encoding, rarity: slot.rarity, name: slot.name }));
   } else {
     fig = await store.figure(body.figureId!);
-    if (!fig || fig.ownerId !== userId) throw new PurchaseError("figure_not_owned", "You no longer own that figure — contact support with your payment signature.", 409);
-    // Listed after the pre-check: don't mint an asset out from under an open listing. The claim is
-    // kept, so cancelling the listing and resuming with the same payment completes the mint.
-    if (!fig.mintAddress && (await store.hasActiveListing(fig.id))) {
-      throw new PurchaseError("figure_listed", "Cancel the figure's market listing, then resume this payment.", 409);
-    }
+    if (!fig) throw new PurchaseError("figure_not_found", "That figure no longer exists — contact support with your payment signature.", 409);
   }
-  const mintAddress = await mintOnce(store, chain, cfg, fig, buyer);
-  return { figureId: fig.id, mintAddress, attemptId: null, resumed };
-}
-
-/** Idempotent mint: deterministic address, reserved before sending, existence-checked on retry. */
-export async function mintOnce(store: PurchaseStore, chain: ChainDeps, cfg: PurchaseConfig, fig: FigureRow, owner: string): Promise<string> {
   const address = chain.assetAddress(fig.id);
-  if (fig.mintAddress && fig.mintAddress !== address) return fig.mintAddress; // minted by another path
-  if (!(await store.reserveMint(fig.id, address))) {
-    const now = await store.figure(fig.id);
-    if (now?.mintAddress) return now.mintAddress;
-    throw new PurchaseError("mint_reserve_failed", "Could not reserve the mint — retry with the same payment.", 503);
+  if (fig.mintAddress !== address) {
+    // The verified transaction created it; double-check the account is visible before recording.
+    if (!(await chain.assetExists(address))) throw new PurchaseError("asset_not_visible", "The mint is not visible on devnet yet — retry in a few seconds.", 503);
+    await store.cancelActiveListings(fig.id);
+    if (!(await store.reserveMint(fig.id, address))) throw new PurchaseError("mint_conflict", "This figure is recorded with a different asset — contact support.", 409);
   }
-  if (await chain.assetExists(address)) return address;
-  try {
-    return await chain.mint({ figureId: fig.id, owner, name: `${fig.name} #${fig.id.slice(0, 8)}`, uri: `${cfg.siteUrl}/api/figures/${fig.id}/metadata` });
-  } catch {
-    // A concurrent retry may have landed the same (deterministic) asset.
-    if (await chain.assetExists(address).catch(() => false)) return address;
-    throw new PurchaseError("mint_failed", "Mint failed on devnet — your payment is recorded; retry with the same payment to resume.", 502);
+  if (fig.ownerId !== userId && body.item === "mint-fee") {
+    throw new PurchaseError("figure_not_owned", "The figure changed owner while minting — contact support with your payment signature.", 409);
   }
+  return { figureId: fig.id, mintAddress: address, attemptId: null, resumed };
 }

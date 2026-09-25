@@ -10,7 +10,8 @@ Updated: 2026-09-24. Plan and contracts: `docs/PLAN_V2.md`.
 | Backend (local Supabase) | Schema, RLS, RPCs, publisher, wallet-link; hardened after independent review |
 | TypeScript core | Bit-for-bit port of the C# domain, fixture-verified |
 | Website (Next.js) | 12 pages + 3 API routes, game embed, market, ranks, friends, devnet SOL flow |
-| Devnet NFTs | Mint route built and unit-tested; treasury unfunded (faucet failed) so no live mint yet |
+| Devnet NFTs | Single-transaction purchase (buyer pays price + mint rent + fees; server mint authority only signs, needs no SOL). Unit-tested; devnet dry run passes in simulation (faucet rate-limited, no live mint yet) |
+| Self-hosting | `deploy/`: Next standalone image + Caddy single origin in front of the Supabase CLI stack; `deploy/up.sh` for a VPS |
 
 ## Unity client
 
@@ -31,8 +32,8 @@ Updated: 2026-09-24. Plan and contracts: `docs/PLAN_V2.md`.
 ## Website (`web/`)
 
 - Pages: `/`, `/play`, `/daily`, `/bosses`, `/market`, `/inventory`, `/u/[handle]`, `/friends`, `/leaderboard`, `/login`.
-- API: figure metadata + PNG, SOL purchase (verify transfer → claim signature once → mint Metaplex Core / enter boss).
-- Tests 41, lint clean. Screenshots: `docs/evidence/web/`.
+- API: figure metadata + PNG, SOL purchase: `POST /api/purchase/sol/prepare` (checks, builds one partially-signed tx: payment → `NEXT_PUBLIC_PAYMENT_RECIPIENT` + authority memo + Core create with payer/owner = buyer) → wallet signs/sends → `POST /api/purchase/sol` (verify tx, claim signature once, record ownership / enter boss).
+- Tests 113, lint clean. Screenshots: `docs/evidence/web/`.
 
 ## Verified on device (Pixel 6a)
 
@@ -42,10 +43,10 @@ Updated: 2026-09-24. Plan and contracts: `docs/PLAN_V2.md`.
 ## Open items
 
 1. Device pass of v2 on Pixel 6a (adb reverse tcp:54321 for online).
-2. Fund devnet treasury (`web/.env.local` → `NEXT_PUBLIC_TREASURY_PUBKEY`) at faucet.solana.com and run a live mint.
+2. Live devnet mint: fund the dry-run buyer printed by `pnpm --filter web devnet-dry-run` at faucet.solana.com and rerun it (the mint authority itself needs no SOL).
 3. Seeker Mobile Wallet Adapter inside the Unity app (web already supports MWA).
 4. Offline progress made before first connecting is not migrated to the server.
-5. Production: HTTPS backend (disable `insecureHttpOption`), hosted Supabase, publisher cron, real domain in wallet message.
+5. Production: HTTPS backend (disable `insecureHttpOption`; `deploy/` gives HTTPS via Caddy), non-default Supabase JWT secret (hosted or self-hosted compose instead of the CLI stack), real domain in wallet message (`WALLET_LINK_DOMAIN`). Publisher cron: installed by `deploy/up.sh`.
 
 ## Commands
 

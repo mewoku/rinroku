@@ -1,15 +1,15 @@
 import { describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
-import { Keypair, PublicKey, type ParsedTransactionWithMeta } from "@solana/web3.js";
-import { purchaseQuoteSchema, purchaseSolBodySchema } from "@/lib/validation";
-import { checkTransfer } from "@/lib/server/solana";
+import { Keypair } from "@solana/web3.js";
+import { purchasePrepareSchema, purchaseQuoteSchema, purchaseSolBodySchema } from "@/lib/validation";
 import { clientKey, TokenBucket } from "@/lib/server/rateLimit";
 
 // Keep the route in "not configured" mode regardless of the developer's .env.local.
 vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "");
-vi.stubEnv("TREASURY_SECRET_KEY", "");
+vi.stubEnv("MINT_AUTHORITY_SECRET_KEY", "");
 
 const { POST, GET } = await import("./purchase/sol/route");
+const prepareRoute = await import("./purchase/sol/prepare/route");
 const metadata = await import("./figures/[id]/metadata/route");
 
 const SIG = "5".repeat(87);
@@ -65,13 +65,13 @@ describe("POST /api/purchase/sol input validation", () => {
     expect((await post(LEGENDARY)).status).toBe(401);
   });
 
-  it("503 when the server has no service role / treasury configured", async () => {
+  it("503 when the server has no service role / mint authority configured", async () => {
     expect((await post(LEGENDARY, { authorization: `Bearer ${"x".repeat(40)}` })).status).toBe(503);
   });
 
   it("GET reports purchases disabled without config", async () => {
     const res = await GET(new NextRequest("http://localhost/api/purchase/sol"));
-    expect(await res.json()).toMatchObject({ enabled: false, treasury: null });
+    expect(await res.json()).toMatchObject({ enabled: false, recipient: null, authority: null });
   });
 
   it("GET quote validates its query and is disabled without config", async () => {
@@ -82,20 +82,63 @@ describe("POST /api/purchase/sol input validation", () => {
   });
 });
 
-describe("treasury config (startup check)", () => {
-  it("disables purchases when NEXT_PUBLIC_TREASURY_PUBKEY does not match the secret", async () => {
-    const kp = Keypair.generate();
+describe("POST /api/purchase/sol/prepare", () => {
+  const prep = (body: unknown, headers: Record<string, string> = {}) =>
+    prepareRoute.POST(
+      new NextRequest("http://localhost/api/purchase/sol/prepare", {
+        method: "POST",
+        headers: { "content-type": "application/json", ...headers },
+        body: typeof body === "string" ? body : JSON.stringify(body),
+      }),
+    );
+  const ITEM = { item: "figure-legendary", day: 24, slot: 5 };
+
+  it("rejects non-JSON, oversized and malformed bodies", async () => {
+    expect((await prep("{}", { "content-type": "text/plain" })).status).toBe(415);
+    expect((await prep("{}", { "content-length": "999999" })).status).toBe(413);
+    expect((await prep("{nope")).status).toBe(400);
+  });
+  it.each([
+    ["a client-chosen price", { ...ITEM, lamports: 1 }],
+    ["a client-chosen buyer", { ...ITEM, buyer: BUYER }],
+    ["a client-chosen recipient", { ...ITEM, recipient: BUYER }],
+    ["a signature (prepare is before payment)", { ...ITEM, signature: SIG }],
+    ["missing refs", { item: "boss-entry" }],
+  ])("400 on %s", async (_n, body) => {
+    expect((await prep(body)).status).toBe(400);
+  });
+  it("503 when purchases are not configured", async () => {
+    expect((await prep(ITEM, { authorization: `Bearer ${"x".repeat(40)}` })).status).toBe(503);
+  });
+  it("schema accepts a well-formed item", () => {
+    expect(purchasePrepareSchema.safeParse({ item: "mint-fee", figureId: crypto.randomUUID() }).success).toBe(true);
+  });
+});
+
+describe("SOL config (payment recipient vs mint authority)", () => {
+  async function load(secret: string, recipient: string) {
     vi.resetModules();
-    vi.stubEnv("TREASURY_SECRET_KEY", JSON.stringify(Array.from(kp.secretKey)));
-    vi.stubEnv("NEXT_PUBLIC_TREASURY_PUBKEY", Keypair.generate().publicKey.toBase58());
-    const env = await import("@/lib/server/env");
-    expect(env.treasuryConfig()).toMatchObject({ ok: false, reason: expect.stringMatching(/does not match/) });
-    vi.resetModules();
-    vi.stubEnv("NEXT_PUBLIC_TREASURY_PUBKEY", kp.publicKey.toBase58());
-    const env2 = await import("@/lib/server/env");
-    expect(env2.treasuryConfig()).toMatchObject({ ok: true, pubkey: kp.publicKey.toBase58() });
-    vi.stubEnv("TREASURY_SECRET_KEY", "");
-    vi.stubEnv("NEXT_PUBLIC_TREASURY_PUBKEY", "");
+    vi.stubEnv("SUPABASE_SERVICE_ROLE_KEY", "");
+    vi.stubEnv("MINT_AUTHORITY_SECRET_KEY", secret);
+    vi.stubEnv("NEXT_PUBLIC_PAYMENT_RECIPIENT", recipient);
+    return (await import("@/lib/server/env")).solConfig();
+  }
+  const kp = Keypair.generate();
+  const secret = JSON.stringify(Array.from(kp.secretKey));
+  const owner = Keypair.generate().publicKey.toBase58();
+
+  it("enabled with a separate public recipient; the recipient needs no secret key", async () => {
+    expect(await load(secret, owner)).toMatchObject({ ok: true, authority: kp.publicKey.toBase58(), recipient: owner });
+  });
+  it("disabled without a recipient, with a malformed one, or when it equals the authority", async () => {
+    expect(await load(secret, "")).toMatchObject({ ok: false, reason: expect.stringMatching(/RECIPIENT missing/) });
+    expect(await load(secret, "not-a-key")).toMatchObject({ ok: false, reason: expect.stringMatching(/not a valid public key/) });
+    expect(await load(secret, kp.publicKey.toBase58())).toMatchObject({ ok: false, reason: expect.stringMatching(/must not be the mint authority/) });
+  });
+  it("disabled with a malformed authority secret", async () => {
+    expect(await load("[1,2,3]", owner)).toMatchObject({ ok: false, reason: expect.stringMatching(/MINT_AUTHORITY_SECRET_KEY/) });
+    vi.stubEnv("MINT_AUTHORITY_SECRET_KEY", "");
+    vi.stubEnv("NEXT_PUBLIC_PAYMENT_RECIPIENT", "");
   });
 });
 
@@ -152,36 +195,4 @@ describe("schema", () => {
   it("accepts a well-formed legendary purchase", () => {
     expect(purchaseSolBodySchema.safeParse({ ...LEGENDARY, slot: 4 }).success).toBe(true);
   });
-});
-
-describe("checkTransfer", () => {
-  const treasury = Keypair.generate().publicKey.toBase58();
-  const tx = (lamports: number, opts: { err?: boolean; signer?: boolean; source?: string; blockTime?: number | null } = {}) =>
-    ({
-      blockTime: opts.blockTime === undefined ? 1_000_000 : opts.blockTime,
-      meta: { err: opts.err ? { InstructionError: [0, "x"] } : null, innerInstructions: [] },
-      transaction: {
-        message: {
-          accountKeys: [{ pubkey: new PublicKey(BUYER), signer: opts.signer ?? true, writable: true }],
-          instructions: [
-            {
-              programId: new PublicKey("11111111111111111111111111111111"),
-              program: "system",
-              parsed: { type: "transfer", info: { source: opts.source ?? BUYER, destination: treasury, lamports } },
-            },
-          ],
-        },
-      },
-    }) as unknown as ParsedTransactionWithMeta;
-  const exp = { buyer: BUYER, treasury, minLamports: 100_000_000 };
-  const now = 1_000_060;
-
-  it("accepts an exact payment", () => expect(checkTransfer(tx(100_000_000), exp, now)).toEqual({ ok: true, lamports: 100_000_000 }));
-  it("rejects underpayment", () => expect(checkTransfer(tx(99_999_999), exp, now).ok).toBe(false));
-  it("rejects failed tx", () => expect(checkTransfer(tx(100_000_000, { err: true }), exp, now).ok).toBe(false));
-  it("rejects missing tx", () => expect(checkTransfer(null, exp, now).ok).toBe(false));
-  it("rejects a tx without block time (M3)", () => expect(checkTransfer(tx(100_000_000, { blockTime: null }), exp, now).ok).toBe(false));
-  it("rejects non-signer buyer", () => expect(checkTransfer(tx(100_000_000, { signer: false }), exp, now).ok).toBe(false));
-  it("rejects transfers from someone else", () => expect(checkTransfer(tx(100_000_000, { source: treasury }), exp, now).ok).toBe(false));
-  it("rejects stale payments", () => expect(checkTransfer(tx(100_000_000), exp, now + 3600).ok).toBe(false));
 });

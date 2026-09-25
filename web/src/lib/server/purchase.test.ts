@@ -3,20 +3,25 @@ import {
   KIND,
   REFUND_KIND,
   PurchaseError,
+  prepareSolPurchase,
   processSolPurchase,
   quote,
   type ChainDeps,
   type Claim,
   type FigureRow,
+  type MintSpec,
   type PurchaseBody,
   type PurchaseConfig,
+  type PurchaseRequest,
   type PurchaseStore,
   type ShelfSlot,
 } from "./purchase";
+import type { PurchaseTxExpectation } from "../solana/purchaseTx";
 import { MINT_FEE_LAMPORTS } from "../economy";
 
 // ------------------------------------------------------------------ in-memory fakes
-const TREASURY = "Treasury1111111111111111111111111111111111";
+const RECIPIENT = "Recipient11111111111111111111111111111111";
+const AUTHORITY = "Authority11111111111111111111111111111111";
 const ALICE = "11111111-1111-4111-8111-111111111111";
 const BOB = "22222222-2222-4222-8222-222222222222";
 const ALICE_WALLET = "AliceWallet111111111111111111111111111111";
@@ -27,11 +32,6 @@ const FIG2 = "55555555-5555-4555-8555-555555555555";
 const TODAY = 24;
 const LEG_PRICE = 100_000_000;
 const sig = (n: number) => `${n}`.padStart(8, "9") + "S".repeat(80);
-
-interface Payment {
-  from: string;
-  lamports: number;
-}
 
 class FakeStore implements PurchaseStore {
   wallets = new Map<string, string | null>([
@@ -71,10 +71,11 @@ class FakeStore implements PurchaseStore {
   async findOwnedFigure(u: string, seed: string, tier: number) {
     return [...this.figures.values()].find((f) => f.ownerId === u && f.seed === seed && f.tier === tier) ?? null;
   }
-  async insertFigure(r: { userId: string; seed: string; tier: number; name: string }) {
-    const id = `00000000-0000-4000-8000-${String(++this.n).padStart(12, "0")}`;
-    const row = { id, name: r.name, ownerId: r.userId, mintAddress: null, seed: r.seed, tier: r.tier };
-    this.figures.set(id, row);
+  async insertFigure(r: { id: string; userId: string; seed: string; tier: number; name: string }) {
+    const existing = this.figures.get(r.id);
+    if (existing) return existing;
+    const row = { id: r.id, name: r.name, ownerId: r.userId, mintAddress: null, seed: r.seed, tier: r.tier };
+    this.figures.set(r.id, row);
     return row;
   }
   async figure(id: string) {
@@ -82,6 +83,9 @@ class FakeStore implements PurchaseStore {
   }
   async hasActiveListing(id: string) {
     return this.listings.has(id);
+  }
+  async cancelActiveListings(id: string) {
+    this.listings.delete(id);
   }
   async boss(id: string) {
     return this.bosses.get(id) ?? null;
@@ -113,40 +117,73 @@ class FakeStore implements PurchaseStore {
   }
 }
 
-class FakeChain implements ChainDeps {
-  payments = new Map<string, Payment>();
-  onChain = new Set<string>();
-  mintCalls = 0;
-  failAfterLanding = false;
-  failBeforeLanding = false;
-  verifyCalls: { signature: string; buyer: string; minLamports: number }[] = [];
+interface Built {
+  buyer: string;
+  recipient: string;
+  lamports: number;
+  memo: string;
+  mint?: MintSpec;
+}
+interface Landed {
+  feePayer: string;
+  recipient: string;
+  lamports: number;
+  memo: string | null;
+  asset: string | null;
+  authoritySigned: boolean;
+}
 
-  async verifyTransfer(signature: string, e: { buyer: string; treasury: string; minLamports: number }) {
-    this.verifyCalls.push({ signature, buyer: e.buyer, minLamports: e.minLamports });
-    const p = this.payments.get(signature);
-    if (!p || e.treasury !== TREASURY) return { ok: false as const, reason: "not found" };
-    if (p.from !== e.buyer) return { ok: false as const, reason: "wrong payer" };
-    if (p.lamports < e.minLamports) return { ok: false as const, reason: "too small" };
-    return { ok: true as const, lamports: p.lamports };
-  }
+/**
+ * Simulates the chain: `buildTx` returns the transaction as JSON; `land` is the buyer signing and
+ * sending it. Landing is atomic like Solana: if the asset already exists, nothing happens.
+ */
+class FakeChain implements ChainDeps {
+  authority = AUTHORITY;
+  onChain = new Set<string>();
+  txs = new Map<string, Landed>();
+  builds: Built[] = [];
+  verifyCalls: PurchaseTxExpectation[] = [];
+  lagging = false;
+
   assetAddress(figureId: string) {
     return `asset-${figureId}`;
   }
-  async assetExists(a: string) {
-    return this.onChain.has(a);
+  legendaryFigureId(u: string, day: number, slot: number) {
+    return `leg-${u}-${day}-${slot}`;
   }
-  async mint({ figureId }: { figureId: string }) {
-    this.mintCalls++;
-    const a = this.assetAddress(figureId);
-    if (this.failBeforeLanding) throw new Error("rpc down");
-    if (this.onChain.has(a)) throw new Error("account already in use"); // Core create on an existing asset
-    this.onChain.add(a);
-    if (this.failAfterLanding) throw new Error("confirmation timeout");
-    return a;
+  memo(u: string, kind: string, ref: string) {
+    return `ronriku:v2:${kind}:${ref}:${u}`;
+  }
+  async assetExists(a: string) {
+    return !this.lagging && this.onChain.has(a);
+  }
+  async buildTx(p: Built) {
+    this.builds.push(p);
+    return { transaction: JSON.stringify(p), lastValidBlockHeight: 1000 };
+  }
+  /** Buyer signs + sends a prepared transaction. Returns false when it fails on-chain (atomic). */
+  land(signature: string, transaction: string): boolean {
+    const b = JSON.parse(transaction) as Built;
+    const asset = b.mint ? this.assetAddress(b.mint.figureId) : null;
+    if (asset && this.onChain.has(asset)) return false; // Core create: account already in use
+    if (asset) this.onChain.add(asset);
+    this.txs.set(signature, { feePayer: b.buyer, recipient: b.recipient, lamports: b.lamports, memo: b.memo, asset, authoritySigned: true });
+    return true;
+  }
+  async verifyTx(signature: string, e: PurchaseTxExpectation) {
+    this.verifyCalls.push(e);
+    const t = this.txs.get(signature);
+    if (!t) return { ok: false as const, reason: "not found" };
+    if (!t.authoritySigned || e.authority !== AUTHORITY) return { ok: false as const, reason: "not prepared by this server" };
+    if (t.memo !== e.memo) return { ok: false as const, reason: "memo mismatch" };
+    if (e.asset && t.asset !== e.asset) return { ok: false as const, reason: "wrong asset" };
+    if (t.recipient !== e.recipient) return { ok: false as const, reason: "wrong recipient" };
+    if (t.lamports < e.minLamports) return { ok: false as const, reason: "too small" };
+    return { ok: true as const, lamports: t.lamports, buyer: t.feePayer };
   }
 }
 
-const cfg: PurchaseConfig = { treasury: TREASURY, siteUrl: "http://x", today: TODAY, now: new Date("2026-09-24T12:00:00Z") };
+const cfg: PurchaseConfig = { recipient: RECIPIENT, siteUrl: "http://x", today: TODAY, now: new Date("2026-09-24T12:00:00Z") };
 let store: FakeStore;
 let chain: FakeChain;
 
@@ -165,32 +202,80 @@ async function expectCode(p: Promise<unknown>, code: string) {
   return e as PurchaseError;
 }
 
-const legendary = (s: string): PurchaseBody => ({ item: "figure-legendary", signature: s, day: TODAY, slot: 5 });
-const mintFee = (s: string, figureId = FIG): PurchaseBody => ({ item: "mint-fee", signature: s, figureId });
-const boss = (s: string): PurchaseBody => ({ item: "boss-entry", signature: s, bossId: BOSS });
+const LEG: PurchaseRequest = { item: "figure-legendary", day: TODAY, slot: 5 };
+const MINT = (figureId = FIG): PurchaseRequest => ({ item: "mint-fee", figureId });
+const BOSSREQ: PurchaseRequest = { item: "boss-entry", bossId: BOSS };
+const withSig = (r: PurchaseRequest, s: string): PurchaseBody => ({ ...r, signature: s });
+const prepare = (u: string, r: PurchaseRequest) => prepareSolPurchase(store, chain, cfg, u, r);
 const run = (u: string, b: PurchaseBody) => processSolPurchase(store, chain, cfg, u, b);
 
-// ------------------------------------------------------------------ tests
-describe("happy paths", () => {
-  it("legendary: verifies the linked wallet paid the shelf price, claims, creates and mints once", async () => {
-    chain.payments.set(sig(1), { from: ALICE_WALLET, lamports: LEG_PRICE });
-    const out = await run(ALICE, legendary(sig(1)));
-    expect(out.mintAddress).toBe(`asset-${out.figureId}`);
-    expect(chain.mintCalls).toBe(1);
-    expect(chain.verifyCalls[0]).toMatchObject({ buyer: ALICE_WALLET, minLamports: LEG_PRICE });
-    expect(store.claims.get(sig(1))).toEqual({ userId: ALICE, kind: KIND["figure-legendary"], refId: `legendary:${TODAY}:5`, lamports: LEG_PRICE });
-  });
+/** prepare → buyer signs/sends → returns the signature. */
+async function pay(u: string, r: PurchaseRequest, s: string) {
+  const p = await prepare(u, r);
+  expect(chain.land(s, p.transaction)).toBe(true);
+  return p;
+}
+const legId = (u: string) => chain.legendaryFigureId(u, TODAY, 5);
 
-  it("mint-fee: mints the owned figure", async () => {
-    chain.payments.set(sig(2), { from: ALICE_WALLET, lamports: MINT_FEE_LAMPORTS });
-    const out = await run(ALICE, mintFee(sig(2)));
-    expect(out).toMatchObject({ figureId: FIG, mintAddress: `asset-${FIG}` });
+// ------------------------------------------------------------------ tests
+describe("prepare: one transaction, buyer pays, server authority only signs", () => {
+  it("legendary: payment to the recipient + Core mint to the linked wallet, server price", async () => {
+    const p = await prepare(ALICE, LEG);
+    expect(p).toMatchObject({ lamports: LEG_PRICE, wallet: ALICE_WALLET, recipient: RECIPIENT, figureId: legId(ALICE), assetAddress: `asset-${legId(ALICE)}` });
+    expect(chain.builds[0]!).toMatchObject({
+      buyer: ALICE_WALLET,
+      recipient: RECIPIENT,
+      lamports: LEG_PRICE,
+      memo: `ronriku:v2:sol_legendary:legendary:${TODAY}:5:${ALICE}`,
+      mint: { figureId: legId(ALICE), uri: `http://x/api/figures/${legId(ALICE)}/metadata` },
+    });
+    expect(chain.builds[0]!.mint!.name.length).toBeLessThanOrEqual(32);
+    expect(store.figures.has(legId(ALICE))).toBe(false); // nothing recorded before payment
+  });
+  it("boss entry: payment + memo, no mint", async () => {
+    const p = await prepare(ALICE, BOSSREQ);
+    expect(p).toMatchObject({ lamports: 10_000_000, figureId: null, assetAddress: null });
+    expect(chain.builds[0]!.mint).toBeUndefined();
+  });
+  it("mint-fee (shard figure claim): buyer-paid mint of the owned figure", async () => {
+    const p = await prepare(ALICE, MINT());
+    expect(p).toMatchObject({ lamports: MINT_FEE_LAMPORTS, assetAddress: `asset-${FIG}` });
+    expect(chain.builds[0]!.buyer).toBe(ALICE_WALLET);
+  });
+  it("requires a linked wallet before building anything", async () => {
+    store.wallets.set(ALICE, null);
+    await expectCode(prepare(ALICE, LEG), "wallet_not_linked");
+    expect(chain.builds).toHaveLength(0);
+  });
+  it("runs all pre-checks before building", async () => {
+    await expectCode(prepare(ALICE, { item: "figure-legendary", day: TODAY, slot: 0 }), "not_sol_item");
+    await expectCode(prepare(ALICE, { item: "figure-legendary", day: TODAY - 2, slot: 5 }), "shelf_rotated");
+    await expectCode(prepare(ALICE, MINT(FIG2)), "figure_not_owned");
+    store.listings.add(FIG);
+    await expectCode(prepare(ALICE, MINT()), "figure_listed");
+    store.attempts.set("open", { id: "open", bossId: BOSS, userId: ALICE, open: true });
+    await expectCode(prepare(ALICE, BOSSREQ), "attempt_open");
+    expect(chain.builds).toHaveLength(0);
+  });
+});
+
+describe("happy paths: verify the landed transaction and record ownership", () => {
+  it("legendary", async () => {
+    await pay(ALICE, LEG, sig(1));
+    const out = await run(ALICE, withSig(LEG, sig(1)));
+    expect(out).toMatchObject({ figureId: legId(ALICE), mintAddress: `asset-${legId(ALICE)}`, resumed: false });
+    expect(store.figures.get(legId(ALICE))).toMatchObject({ ownerId: ALICE, mintAddress: `asset-${legId(ALICE)}` });
+    expect(store.claims.get(sig(1))).toEqual({ userId: ALICE, kind: KIND["figure-legendary"], refId: `legendary:${TODAY}:5`, lamports: LEG_PRICE });
+    expect(chain.verifyCalls[0]).toMatchObject({ recipient: RECIPIENT, authority: AUTHORITY, minLamports: LEG_PRICE, asset: `asset-${legId(ALICE)}` });
+  });
+  it("mint-fee", async () => {
+    await pay(ALICE, MINT(), sig(2));
+    expect(await run(ALICE, withSig(MINT(), sig(2)))).toMatchObject({ figureId: FIG, mintAddress: `asset-${FIG}` });
     expect(store.figures.get(FIG)!.mintAddress).toBe(`asset-${FIG}`);
   });
-
-  it("boss-entry: opens an attempt with the ledger row written atomically", async () => {
-    chain.payments.set(sig(3), { from: ALICE_WALLET, lamports: 10_000_000 });
-    const out = await run(ALICE, boss(sig(3)));
+  it("boss-entry opens an attempt with the ledger row written atomically", async () => {
+    await pay(ALICE, BOSSREQ, sig(3));
+    const out = await run(ALICE, withSig(BOSSREQ, sig(3)));
     expect(out.attemptId).toBeTruthy();
     expect(store.claims.get(sig(3))).toMatchObject({ userId: ALICE, kind: "boss_entry", refId: out.attemptId });
   });
@@ -198,178 +283,159 @@ describe("happy paths", () => {
 
 describe("C1: a paid signature is bound to user + kind + ref", () => {
   beforeEach(async () => {
-    chain.payments.set(sig(10), { from: ALICE_WALLET, lamports: MINT_FEE_LAMPORTS });
-    await run(ALICE, mintFee(sig(10)));
+    await pay(ALICE, MINT(), sig(10));
+    await run(ALICE, withSig(MINT(), sig(10)));
   });
-
   it("cannot be reused for a more expensive item", async () => {
-    await expectCode(run(ALICE, legendary(sig(10))), "claim_mismatch");
+    await expectCode(run(ALICE, withSig(LEG, sig(10))), "claim_mismatch");
   });
   it("cannot be reused for another figure", async () => {
     store.figures.set(FIG2, { id: FIG2, name: "OTHER", ownerId: ALICE, mintAddress: null });
-    await expectCode(run(ALICE, mintFee(sig(10), FIG2)), "claim_mismatch");
+    await expectCode(run(ALICE, withSig(MINT(FIG2), sig(10))), "claim_mismatch");
     expect(store.figures.get(FIG2)!.mintAddress).toBeNull();
   });
   it("cannot be reused for a boss entry", async () => {
-    await expectCode(run(ALICE, boss(sig(10))), "claim_mismatch");
+    await expectCode(run(ALICE, withSig(BOSSREQ, sig(10))), "claim_mismatch");
   });
   it("cannot be claimed by another user", async () => {
-    await expectCode(run(BOB, mintFee(sig(10), FIG2)), "signature_used");
+    await expectCode(run(BOB, withSig(MINT(FIG2), sig(10))), "signature_used");
   });
-  it("a same-item retry only resumes (no second mint)", async () => {
-    const again = await run(ALICE, mintFee(sig(10)));
-    expect(again).toMatchObject({ figureId: FIG, mintAddress: `asset-${FIG}`, resumed: true });
-    expect(chain.mintCalls).toBe(1);
+  it("a same-item retry only resumes", async () => {
+    expect(await run(ALICE, withSig(MINT(), sig(10)))).toMatchObject({ figureId: FIG, mintAddress: `asset-${FIG}`, resumed: true });
   });
-  it("a boss signature cannot be replayed for another raid attempt or item", async () => {
-    chain.payments.set(sig(11), { from: ALICE_WALLET, lamports: 10_000_000 });
-    const first = await run(ALICE, boss(sig(11)));
-    const again = await run(ALICE, boss(sig(11)));
-    expect(again).toMatchObject({ attemptId: first.attemptId, resumed: true });
-    await expectCode(run(ALICE, legendary(sig(11))), "claim_mismatch");
+  it("an unclaimed transaction prepared for one item cannot be claimed as another (memo)", async () => {
+    await pay(ALICE, BOSSREQ, sig(11));
+    await expectCode(run(ALICE, withSig(LEG, sig(11))), "payment_invalid");
+    expect(store.claims.has(sig(11))).toBe(false);
+  });
+  it("a boss signature cannot be replayed for another attempt", async () => {
+    await pay(ALICE, BOSSREQ, sig(12));
+    const first = await run(ALICE, withSig(BOSSREQ, sig(12)));
+    expect(await run(ALICE, withSig(BOSSREQ, sig(12)))).toMatchObject({ attemptId: first.attemptId, resumed: true });
   });
 });
 
-describe("C2: the buyer is the caller's linked wallet", () => {
-  it("rejects a victim's transfer claimed by someone else", async () => {
-    chain.payments.set(sig(20), { from: BOB_WALLET, lamports: LEG_PRICE }); // Bob paid
-    await expectCode(run(ALICE, legendary(sig(20))), "payment_invalid"); // Alice tries to claim it
+describe("C2: only the user the transaction was prepared for can claim it", () => {
+  it("rejects a victim's landed purchase claimed by someone else", async () => {
+    await pay(BOB, LEG, sig(20));
+    await expectCode(run(ALICE, withSig(LEG, sig(20))), "payment_invalid");
     expect(store.claims.has(sig(20))).toBe(false);
-    const out = await run(BOB, legendary(sig(20))); // Bob can still claim his own payment
-    expect(out.mintAddress).toBeTruthy();
+    expect((await run(BOB, withSig(LEG, sig(20)))).mintAddress).toBe(`asset-${legId(BOB)}`);
   });
-  it("requires a linked wallet (before any chain call)", async () => {
+  it("rejects a plain transfer the server did not prepare", async () => {
+    chain.txs.set(sig(21), { feePayer: ALICE_WALLET, recipient: RECIPIENT, lamports: LEG_PRICE, memo: null, asset: null, authoritySigned: false });
+    await expectCode(run(ALICE, withSig(BOSSREQ, sig(21))), "payment_invalid");
+  });
+  it("rejects underpayment of the server price (M4)", async () => {
+    const p = await prepare(ALICE, LEG);
+    chain.land(sig(22), JSON.stringify({ ...(JSON.parse(p.transaction) as Built), lamports: LEG_PRICE - 1 }));
+    await expectCode(run(ALICE, withSig(LEG, sig(22))), "payment_invalid");
+  });
+  it("delivery does not depend on the wallet still being linked", async () => {
+    await pay(ALICE, LEG, sig(23));
     store.wallets.set(ALICE, null);
-    await expectCode(run(ALICE, legendary(sig(21))), "wallet_not_linked");
-    await expectCode(quote(store, cfg, ALICE, legendary(sig(21))), "wallet_not_linked");
-    expect(chain.verifyCalls).toHaveLength(0);
+    expect((await run(ALICE, withSig(LEG, sig(23)))).figureId).toBe(legId(ALICE));
   });
-  it("rejects underpayment of the shelf price (M4)", async () => {
-    chain.payments.set(sig(22), { from: ALICE_WALLET, lamports: LEG_PRICE - 1 });
-    await expectCode(run(ALICE, legendary(sig(22))), "payment_invalid");
+});
+
+describe("atomic payment + mint (no 'paid but not minted')", () => {
+  it("two prepared transactions for the same Legendary: only one can land, the other charges nothing", async () => {
+    const a = await prepare(ALICE, LEG);
+    const b = await prepare(ALICE, LEG);
+    expect(chain.land(sig(30), a.transaction)).toBe(true);
+    expect(chain.land(sig(31), b.transaction)).toBe(false);
+    expect(chain.txs.has(sig(31))).toBe(false);
+  });
+  it("landed but never verified → prepare self-heals ownership instead of charging again", async () => {
+    await pay(ALICE, LEG, sig(32));
+    await expectCode(prepare(ALICE, LEG), "already_owned");
+    expect(store.figures.get(legId(ALICE))).toMatchObject({ ownerId: ALICE, mintAddress: `asset-${legId(ALICE)}` });
+    expect(chain.builds).toHaveLength(1);
+    expect(await run(ALICE, withSig(LEG, sig(32)))).toMatchObject({ figureId: legId(ALICE), mintAddress: `asset-${legId(ALICE)}` });
+    expect([...store.figures.values()].filter((f) => f.seed === "99")).toHaveLength(1);
+  });
+  it("mint-fee landed but never verified → prepare records the mint", async () => {
+    await pay(ALICE, MINT(), sig(33));
+    await expectCode(prepare(ALICE, MINT()), "already_minted");
+    expect(store.figures.get(FIG)!.mintAddress).toBe(`asset-${FIG}`);
+  });
+  it("RPC lag: asset not visible yet → retryable 503, then the same signature completes", async () => {
+    await pay(ALICE, MINT(), sig(34));
+    chain.lagging = true;
+    await expectCode(run(ALICE, withSig(MINT(), sig(34))), "asset_not_visible");
+    chain.lagging = false;
+    expect(await run(ALICE, withSig(MINT(), sig(34)))).toMatchObject({ mintAddress: `asset-${FIG}`, resumed: true });
+  });
+  it("a figure recorded with another address is not re-minted", async () => {
+    store.figures.get(FIG)!.mintAddress = "someone-else";
+    await expectCode(prepare(ALICE, MINT()), "already_minted");
+    await expectCode(quote(store, cfg, ALICE, MINT()), "already_minted");
   });
 });
 
 describe("H1: boss entry never loses a payment", () => {
-  it("pre-checks an open attempt before payment", async () => {
-    store.attempts.set("open", { id: "open", bossId: BOSS, userId: ALICE, open: true });
-    await expectCode(quote(store, cfg, ALICE, { item: "boss-entry", bossId: BOSS }), "attempt_open");
-  });
   it("pre-checks inactive raids and unpublished keys", async () => {
-    await expectCode(quote(store, { ...cfg, now: new Date("2026-10-05T00:00:00Z") }, ALICE, { item: "boss-entry", bossId: BOSS }), "boss_not_active");
+    await expectCode(quote(store, { ...cfg, now: new Date("2026-10-05T00:00:00Z") }, ALICE, BOSSREQ), "boss_not_active");
     store.keysPublished = false;
-    await expectCode(quote(store, cfg, ALICE, { item: "boss-entry", bossId: BOSS }), "puzzle_not_published");
+    await expectCode(quote(store, cfg, ALICE, BOSSREQ), "puzzle_not_published");
   });
-  it("records refund_due when the attempt opened between quote and payment", async () => {
-    chain.payments.set(sig(30), { from: ALICE_WALLET, lamports: 10_000_000 });
+  it("records refund_due when the attempt opened between prepare and payment", async () => {
+    await pay(ALICE, BOSSREQ, sig(40));
     store.attempts.set("open", { id: "open", bossId: BOSS, userId: ALICE, open: true });
-    await expectCode(run(ALICE, boss(sig(30))), "refund_due");
-    expect(store.claims.get(sig(30))).toMatchObject({ userId: ALICE, kind: REFUND_KIND, lamports: 10_000_000 });
-    await expectCode(run(ALICE, boss(sig(30))), "refund_due"); // not claimable afterwards
+    await expectCode(run(ALICE, withSig(BOSSREQ, sig(40))), "refund_due");
+    expect(store.claims.get(sig(40))).toMatchObject({ userId: ALICE, kind: REFUND_KIND, lamports: 10_000_000 });
+    await expectCode(run(ALICE, withSig(BOSSREQ, sig(40))), "refund_due"); // not claimable afterwards
   });
   it("records refund_due when the RPC fails after payment", async () => {
-    chain.payments.set(sig(31), { from: ALICE_WALLET, lamports: 10_000_000 });
+    await pay(ALICE, BOSSREQ, sig(41));
     store.enterBossFailure = "boss_not_active";
-    await expectCode(run(ALICE, boss(sig(31))), "refund_due");
-    expect(store.claims.get(sig(31))!.kind).toBe(REFUND_KIND);
+    await expectCode(run(ALICE, withSig(BOSSREQ, sig(41))), "refund_due");
+    expect(store.claims.get(sig(41))!.kind).toBe(REFUND_KIND);
   });
   it("does not record anything when there was no valid payment", async () => {
-    store.attempts.set("open", { id: "open", bossId: BOSS, userId: ALICE, open: true });
-    await expectCode(run(ALICE, boss(sig(32))), "attempt_open");
+    await expectCode(run(ALICE, withSig(BOSSREQ, sig(42))), "payment_invalid");
     expect(store.claims.size).toBe(0);
   });
 });
 
-describe("H2: no double mint", () => {
-  it("mint landed but confirmation failed → retry detects the asset and does not mint again", async () => {
-    chain.payments.set(sig(40), { from: ALICE_WALLET, lamports: MINT_FEE_LAMPORTS });
-    chain.failAfterLanding = true;
-    const out = await run(ALICE, mintFee(sig(40))); // catch path sees the asset on-chain
-    expect(out.mintAddress).toBe(`asset-${FIG}`);
-    chain.failAfterLanding = false;
-    await run(ALICE, mintFee(sig(40)));
-    expect(chain.mintCalls).toBe(1);
-  });
-  it("mint failed before landing → error, then the retry mints exactly once at the reserved address", async () => {
-    chain.payments.set(sig(41), { from: ALICE_WALLET, lamports: LEG_PRICE });
-    chain.failBeforeLanding = true;
-    await expectCode(run(ALICE, legendary(sig(41))), "mint_failed");
-    const reserved = [...store.figures.values()].find((f) => f.seed === "99")!;
-    expect(reserved.mintAddress).toBe(`asset-${reserved.id}`); // persisted before send
-    chain.failBeforeLanding = false;
-    const out = await run(ALICE, legendary(sig(41)));
-    expect(out).toMatchObject({ figureId: reserved.id, mintAddress: `asset-${reserved.id}`, resumed: true });
-    expect([...store.figures.values()].filter((f) => f.seed === "99")).toHaveLength(1); // one figure row
-    expect(chain.onChain.size).toBe(1);
-  });
-  it("a figure reserved for another address is not re-minted", async () => {
-    store.figures.get(FIG)!.mintAddress = "someone-else";
-    chain.payments.set(sig(42), { from: ALICE_WALLET, lamports: MINT_FEE_LAMPORTS });
-    await expectCode(quote(store, cfg, ALICE, { item: "mint-fee", figureId: FIG }), "already_minted");
-    await expectCode(run(ALICE, mintFee(sig(42))), "refund_due"); // paid anyway → refund, no mint
-    expect(chain.mintCalls).toBe(0);
-  });
-});
-
 describe("H3: buyers are never left with nothing", () => {
-  it("the earlier-claim lookup runs before shelf checks (resume after the shelf rotated)", async () => {
-    chain.payments.set(sig(50), { from: ALICE_WALLET, lamports: LEG_PRICE });
-    chain.failBeforeLanding = true;
-    await expectCode(run(ALICE, legendary(sig(50))), "mint_failed");
-    chain.failBeforeLanding = false;
-    const later = { ...cfg, today: TODAY + 3 }; // shelf rotated; quote would say shelf_rotated
-    const out = await processSolPurchase(store, chain, later, ALICE, legendary(sig(50)));
-    expect(out.mintAddress).toBeTruthy();
+  it("verification has no time-sensitive checks (resume after the shelf rotated)", async () => {
+    await pay(ALICE, LEG, sig(50));
+    const later = { ...cfg, today: TODAY + 3 };
+    expect((await processSolPurchase(store, chain, later, ALICE, withSig(LEG, sig(50)))).mintAddress).toBe(`asset-${legId(ALICE)}`);
   });
-  it("'already own this Legendary' is caught by the pre-payment quote", async () => {
-    chain.payments.set(sig(51), { from: ALICE_WALLET, lamports: LEG_PRICE });
-    await run(ALICE, legendary(sig(51)));
-    await expectCode(quote(store, cfg, ALICE, { item: "figure-legendary", day: TODAY, slot: 5 }), "already_owned");
+  it("'already own this Legendary' is caught before payment", async () => {
+    await pay(ALICE, LEG, sig(51));
+    await run(ALICE, withSig(LEG, sig(51)));
+    await expectCode(quote(store, cfg, ALICE, LEG), "already_owned");
+    await expectCode(prepare(ALICE, LEG), "already_owned");
   });
-  it("a verified payment whose pre-check fails after paying is recorded as refund_due", async () => {
-    chain.payments.set(sig(52), { from: ALICE_WALLET, lamports: LEG_PRICE });
-    chain.payments.set(sig(53), { from: ALICE_WALLET, lamports: LEG_PRICE });
-    await run(ALICE, legendary(sig(52)));
-    await expectCode(run(ALICE, legendary(sig(53))), "refund_due");
-    expect(store.claims.get(sig(53))!.kind).toBe(REFUND_KIND);
-  });
-  it("rejects non-SOL shelf items and rotated shelves before payment", async () => {
-    await expectCode(quote(store, cfg, ALICE, { item: "figure-legendary", day: TODAY, slot: 0 }), "not_sol_item");
-    await expectCode(quote(store, cfg, ALICE, { item: "figure-legendary", day: TODAY - 2, slot: 5 }), "shelf_rotated");
-    await expectCode(quote(store, cfg, ALICE, { item: "figure-legendary", day: TODAY, slot: 3 }), "shelf_not_published");
+  it("a Legendary traded away cannot be bought into the same deterministic asset again", async () => {
+    await pay(ALICE, LEG, sig(52));
+    await run(ALICE, withSig(LEG, sig(52)));
+    store.figures.get(legId(ALICE))!.ownerId = BOB;
+    await expectCode(prepare(ALICE, LEG), "already_owned");
   });
 });
 
-describe("M5: mint-fee pre-checks", () => {
-  it("rejects a figure with an active listing", async () => {
+describe("M5: listings vs minting", () => {
+  it("listed between prepare and verify → the listing is cancelled and the mint recorded", async () => {
+    await pay(ALICE, MINT(), sig(60));
     store.listings.add(FIG);
-    await expectCode(quote(store, cfg, ALICE, { item: "mint-fee", figureId: FIG }), "figure_listed");
-  });
-  it("listed between quote and resume → no mint until the listing is cancelled, then resumes", async () => {
-    chain.payments.set(sig(70), { from: ALICE_WALLET, lamports: MINT_FEE_LAMPORTS });
-    chain.failBeforeLanding = true;
-    await expectCode(run(ALICE, mintFee(sig(70))), "mint_failed");
-    chain.failBeforeLanding = false;
-    store.figures.get(FIG)!.mintAddress = null; // pretend the reservation was not persisted
-    store.listings.add(FIG);
-    await expectCode(run(ALICE, mintFee(sig(70))), "figure_listed");
-    store.listings.delete(FIG);
-    expect((await run(ALICE, mintFee(sig(70)))).mintAddress).toBe(`asset-${FIG}`);
-  });
-  it("rejects someone else's figure", async () => {
-    await expectCode(quote(store, cfg, ALICE, { item: "mint-fee", figureId: FIG2 }), "figure_not_owned");
+    expect((await run(ALICE, withSig(MINT(), sig(60)))).mintAddress).toBe(`asset-${FIG}`);
+    expect(store.listings.has(FIG)).toBe(false);
   });
   it("quotes the mint fee", async () => {
-    expect((await quote(store, cfg, ALICE, { item: "mint-fee", figureId: FIG })).lamports).toBe(MINT_FEE_LAMPORTS);
+    expect((await quote(store, cfg, ALICE, MINT())).lamports).toBe(MINT_FEE_LAMPORTS);
   });
 });
 
 describe("concurrency", () => {
   it("a duplicate claim insert (race) falls back to resume, not a second delivery", async () => {
-    chain.payments.set(sig(60), { from: ALICE_WALLET, lamports: MINT_FEE_LAMPORTS });
-    const [a, b] = await Promise.all([run(ALICE, mintFee(sig(60))), run(ALICE, mintFee(sig(60)))]);
+    await pay(ALICE, LEG, sig(70));
+    const [a, b] = await Promise.all([run(ALICE, withSig(LEG, sig(70))), run(ALICE, withSig(LEG, sig(70)))]);
     expect(a.mintAddress).toBe(b.mintAddress);
-    expect(chain.onChain.size).toBe(1); // a second Core create at the same address fails on-chain
     expect(store.claims.size).toBe(1);
+    expect([...store.figures.values()].filter((f) => f.seed === "99")).toHaveLength(1);
   });
 });

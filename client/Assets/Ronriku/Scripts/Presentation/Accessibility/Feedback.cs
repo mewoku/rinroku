@@ -47,7 +47,7 @@ namespace Ronriku.Presentation.Accessibility
         {
             if (_source == null || !SoundEnabled || !Clips.TryGetValue(sfx, out var clip)) return;
             _source.pitch = 1f + Random.Range(-0.03f, 0.03f);
-            _source.PlayOneShot(clip, volume);
+            _source.PlayOneShot(clip, volume * RonrikuTuning.Current.sfxVolume);
         }
 
         /// <summary>Tiny chiptune synthesizer: square / triangle / noise voices with linear envelopes.</summary>

@@ -53,6 +53,9 @@ function refsPresent<T extends z.ZodType<PurchaseShape>>(schema: T) {
 export const purchaseSolBodySchema = refsPresent(z.object({ ...purchaseFields, signature: txSignatureSchema }).strict());
 export type PurchaseSolBody = z.infer<typeof purchaseSolBodySchema>;
 
+/** POST /api/purchase/sol/prepare body: the item only (price, buyer and recipient come from the server). */
+export const purchasePrepareSchema = refsPresent(z.object(purchaseFields).strict());
+
 /** GET quote query (pre-payment checks), numbers arrive as strings. */
 export const purchaseQuoteSchema = refsPresent(
   z

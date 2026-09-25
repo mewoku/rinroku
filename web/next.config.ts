@@ -6,6 +6,9 @@ import type { NextConfig } from "next";
 const apiCsp = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'";
 
 const nextConfig: NextConfig = {
+  // Self-contained server bundle for the Docker image (deploy/web.Dockerfile sets NEXT_STANDALONE=1);
+  // plain `next start` keeps working without it.
+  output: process.env.NEXT_STANDALONE === "1" ? "standalone" : undefined,
   // Monorepo root (pnpm workspace) — avoids Next guessing from stray lockfiles in the home dir.
   outputFileTracingRoot: path.join(__dirname, ".."),
   // Keep the Solana/Umi stack as plain Node requires in route handlers.
@@ -26,6 +29,8 @@ const nextConfig: NextConfig = {
       },
       { source: "/api/:path*", headers: [{ key: "Content-Security-Policy", value: apiCsp }] },
       // Unity pre-compressed builds (Compression Format = Brotli/Gzip without decompression fallback).
+      // `.unityweb` builds (decompression fallback) need no special headers. Behind deploy/ Caddy
+      // serves /unity/* itself with the same rules (deploy/Caddyfile).
       {
         source: "/unity/Build/:file*.wasm.br",
         headers: [{ key: "Content-Encoding", value: "br" }, { key: "Content-Type", value: "application/wasm" }],

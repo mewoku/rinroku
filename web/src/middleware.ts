@@ -12,7 +12,7 @@ export function middleware(req: NextRequest) {
     nonce,
     unity: req.nextUrl.pathname === "/play" || req.nextUrl.pathname.startsWith("/play/"),
     dev: process.env.NODE_ENV !== "production",
-    supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://127.0.0.1:54321",
+    supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL ?? "http://127.0.0.1:54321", // "same-origin" → 'self' only
     rpcUrl: process.env.NEXT_PUBLIC_SOLANA_RPC_URL || "https://api.devnet.solana.com",
   });
   const requestHeaders = new Headers(req.headers);

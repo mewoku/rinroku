@@ -145,6 +145,26 @@ namespace Ronriku.Infrastructure.Online
             };
         }
 
+        /// <summary>v3 arcade level (Battle / Cards / Dash / Crawl / Boss) with its compact input replay.</summary>
+        public async Task<LevelSubmitResult> CompleteArcadeLevel(int world, int level, string mode, int stars, int elapsedMs, string proof)
+        {
+            JToken r = await _client.Rpc("complete_arcade_level", new JObject
+            {
+                ["p_world"] = world,
+                ["p_level"] = level,
+                ["p_mode"] = mode,
+                ["p_stars"] = stars,
+                ["p_elapsed_ms"] = elapsedMs,
+                ["p_proof"] = proof
+            });
+            return new LevelSubmitResult
+            {
+                Earned = r["earned"]?.Value<int>() ?? 0,
+                Stars = r["stars"]?.Value<int>() ?? 0,
+                FirstClear = r["first_clear"]?.Value<bool>() ?? false
+            };
+        }
+
         public async Task<DailySubmitResult> SubmitDaily(int day, IReadOnlyList<TrialOutcome> outcomes)
         {
             var list = new JArray();

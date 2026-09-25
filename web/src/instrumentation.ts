@@ -1,17 +1,20 @@
 /** Startup checks (Next.js instrumentation hook). Never prints secrets. */
 export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
-  const raw = process.env.TREASURY_SECRET_KEY;
-  const pub = process.env.NEXT_PUBLIC_TREASURY_PUBKEY;
-  if (!raw && !pub) return; // SOL purchases not configured
+  if (!process.env.MINT_AUTHORITY_SECRET_KEY && !process.env.NEXT_PUBLIC_PAYMENT_RECIPIENT) return; // SOL purchases not configured
+  if (process.env.TREASURY_SECRET_KEY || process.env.NEXT_PUBLIC_TREASURY_PUBKEY) {
+    console.warn("[ronriku] TREASURY_SECRET_KEY / NEXT_PUBLIC_TREASURY_PUBKEY are obsolete: use MINT_AUTHORITY_SECRET_KEY + NEXT_PUBLIC_PAYMENT_RECIPIENT.");
+  }
   let reason: string | null = null;
   try {
-    const { Keypair } = await import("@solana/web3.js");
-    const derived = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(raw ?? "[]") as number[])).publicKey.toBase58();
-    if (derived !== pub) reason = "NEXT_PUBLIC_TREASURY_PUBKEY does not match TREASURY_SECRET_KEY";
+    const { Keypair, PublicKey } = await import("@solana/web3.js");
+    const authority = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(process.env.MINT_AUTHORITY_SECRET_KEY ?? "[]") as number[])).publicKey.toBase58();
+    const recipient = new PublicKey(process.env.NEXT_PUBLIC_PAYMENT_RECIPIENT ?? "").toBase58();
+    if (recipient === authority) reason = "NEXT_PUBLIC_PAYMENT_RECIPIENT must not be the mint authority";
+    else console.log(`[ronriku] SOL purchases: payments → ${recipient}, mint authority ${authority} (needs no SOL)`);
   } catch {
-    reason = "TREASURY_SECRET_KEY missing or malformed";
+    reason = "MINT_AUTHORITY_SECRET_KEY or NEXT_PUBLIC_PAYMENT_RECIPIENT missing or malformed";
   }
-  // The purchase route re-checks this on every request (lib/server/env.ts treasuryConfig).
+  // The purchase routes re-check this on every request (lib/server/env.ts solConfig).
   if (reason) console.error(`[ronriku] SOL purchases disabled: ${reason}`);
 }

@@ -26,7 +26,7 @@ cd ..
 
 # Website
 cp web/.env.example web/.env.local   # fill from `npx supabase status -o env` (in backend/)
-pnpm --filter web create-treasury    # devnet treasury keypair into web/.env.local; fund it at faucet.solana.com
+pnpm --filter web create-mint-authority   # server mint authority (needs no SOL) + payment recipient into web/.env.local
 ```
 
 Unity (open `client/`):
@@ -40,6 +40,10 @@ pnpm --filter web build && pnpm --filter web start    # http://localhost:3000, g
 ```
 
 On a phone, `adb reverse tcp:54321 tcp:54321` lets the APK reach the local backend.
+
+Self-hosting (Docker: Next.js + Caddy + Supabase on one origin, local or a VPS): [deploy/README.md](deploy/README.md).
+
+SOL payments go to `NEXT_PUBLIC_PAYMENT_RECIPIENT`. Each purchase is one transaction the server prepares and partially signs (payment + memo + Metaplex Core mint); the buyer's wallet signs, pays all fees and rent, and sends it. `pnpm --filter web devnet-dry-run` exercises this on devnet.
 
 ## Tests
 

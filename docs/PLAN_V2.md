@@ -81,8 +81,9 @@ Source of truth: `client/Assets/Ronriku/Scripts/Domain/Figures/` (C#). TypeScrip
 - Currency **Shards** (off-chain, server-authoritative balance).
 - Earn: level clear 20 (+10 per extra star), Daily completion 100 (+10 × streak, cap 100), boss win 300–1000.
 - Spend: boss entry 150 shards (or 0.01 devnet SOL), figures Common 300 / Rare 800 / Epic 2000 shards, Legendary devnet SOL only (0.1).
-- Figures bought with SOL are minted as Metaplex Core NFTs to the buyer's wallet. Shard-bought figures are off-chain until the owner pays a small devnet mint fee to mint them.
-- Marketplace: off-chain listings for shards; NFT listings for devnet SOL use a Core **TransferDelegate** approved to the treasury; the server transfers after verifying payment.
+- Figures bought with SOL are minted as Metaplex Core NFTs to the buyer's wallet. Shard-bought figures are off-chain until the owner claims them: the claim is the same buyer-paid transaction (mint fee to the recipient + Core create, rent and fees paid by the owner's wallet).
+- Payments go to `NEXT_PUBLIC_PAYMENT_RECIPIENT` (a public address; its key is not on the server). The server mint authority (`MINT_AUTHORITY_SECRET_KEY`) co-signs each prepared transaction (memo binding user + item; Core create authority; update authority) and never pays, so it needs no SOL.
+- Marketplace: off-chain listings for shards; NFT listings for devnet SOL use a Core **TransferDelegate** approved to the server mint authority; the server transfers after verifying payment (planned; the buyer must pay fees, as in purchases).
 
 ## 7. Backend contract (Supabase, local via `supabase start`)
 
@@ -105,9 +106,9 @@ Tables (all with RLS; writes to economy/progress only through `security definer`
 
 RPCs: `complete_level(world, level, stars, elapsed_ms, proof jsonb)`, `submit_daily(day, outcomes jsonb)`, `buy_figure_shards(shop_item)`, `enter_boss(boss_id, pay_with)`, `finish_boss(attempt_id, result jsonb)`, `list_figure`, `buy_listing`, `send_friend_request(handle)`, `respond_friend_request`, `leaderboard(scope, limit)` (global / daily / friends / boss).
 
-Edge functions / Next API: `wallet-link` (nonce + signature verify), `sol-purchase` (verify devnet transfer by signature, mint Core NFT via Umi, record ledger), `figure-metadata/[id]` (JSON + PNG).
+Edge functions / Next API: `wallet-link` (nonce + signature verify), `purchase/sol/prepare` (pre-checks, one partially-signed transaction: transfer → recipient, authority memo, Core create with payer = owner = buyer), `purchase/sol` (verify the landed transaction, claim its signature once, record ownership), `figure-metadata/[id]` (JSON + PNG).
 
-Secrets: devnet treasury keypair only in `.env.local` (never committed); service-role key only server-side.
+Secrets: mint-authority keypair only in `.env.local` / `deploy/.env` (never committed); service-role key only server-side.
 
 ## 8. Level definitions (compact)
 

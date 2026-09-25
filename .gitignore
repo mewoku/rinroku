@@ -30,3 +30,6 @@ dist/
 
 # Node workspaces
 node_modules/
+
+# Music renders from RONRIKU/Export Music WAVs (large, regenerable)
+docs/evidence/audio/

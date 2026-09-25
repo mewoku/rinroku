@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Ronriku.Domain.Adventure;
+using Ronriku.Domain.Arcade;
 using Ronriku.Domain.Daily;
 using Ronriku.Domain.Figures;
 using Ronriku.Domain.Player;
@@ -9,7 +10,10 @@ using Ronriku.Domain.Shop;
 using Ronriku.Infrastructure.Analytics;
 using Ronriku.Infrastructure.Online;
 using Ronriku.Infrastructure.Persistence;
+using Ronriku.Presentation;
 using Ronriku.Presentation.Accessibility;
+using Ronriku.Presentation.Arcade;
+using Ronriku.Presentation.Audio;
 using Ronriku.Presentation.Components;
 using Ronriku.Presentation.Screens;
 using Ronriku.Presentation.Shell;
@@ -42,13 +46,19 @@ namespace Ronriku.Composition
         private LogicPuzzleData _currentLogic;
         private OnlineService _online;
 
+        [Tooltip("Game-feel / audio / arcade timing knobs. Edit the asset to tune without code.")]
+        [SerializeField] private RonrikuTuning tuning;
+
         private void Awake()
         {
             Application.targetFrameRate = 60;
+            if (tuning != null) RonrikuTuning.Current = tuning;
             Screen.orientation = ScreenOrientation.Portrait;
             _analytics = new LocalAnalyticsService();
             _haptics = new PlatformHapticsService { Enabled = PlayerPrefs.GetInt("ronriku.haptics", 1) == 1 };
             Feedback.Init(gameObject, _haptics);
+            Music.Init(gameObject);
+            Music.Play(MusicTrack.Menu);
             _profiles = new JsonFileProfileRepository(RuntimeConfig.ProfileDirectory ?? Application.persistentDataPath);
             _profile = _profiles.Load();
             _document = GetComponent<UIDocument>();
@@ -161,6 +171,7 @@ namespace Ronriku.Composition
         private VisualElement CreateTab(AppTab tab)
         {
             ClearCurrent();
+            Music.Play(MusicTrack.Menu);
             switch (tab)
             {
                 case AppTab.Daily: return DailyTab();
@@ -278,6 +289,8 @@ namespace Ronriku.Composition
         private void BeginDaily()
         {
             _session = new DailySession(DailyPlan.For(Today));
+            Music.Play(MusicTrack.Daily);
+            Music.SetIntensity(1);
             _analytics.Track("daily_started", DailyProps(_session.Plan));
             ShowDailyTrial();
         }
@@ -330,49 +343,129 @@ namespace Ronriku.Composition
 
         // ---------------------------------------------------------------- adventure
 
+        private static MusicTrack WorldTrack(int world) => (MusicTrack)((int)MusicTrack.World1 + Mathf.Clamp(world, 0, 4));
+
+        private void BackToMap()
+        {
+            Music.Play(MusicTrack.Menu);
+            Music.SetIntensity(1);
+            _shell.ShowTab(AppTab.Play);
+        }
+
+        /// <summary>Adventure levels (v3): each index plays a fixed arcade mode (Domain/Arcade/LevelModes).</summary>
         private void PlayLevel(int world, int index)
         {
+            ClearCurrent();
             LevelDef def = LevelDef.For(world, index);
-            if (def.IsBoss)
-            {
-                PlayBossStages($"W{world + 1} BOSS", def.Monster(), def.BossStages(), 0, 0, new List<TrialOutcome>(),
-                    (elapsed, answers) => FinishWorldBoss(world, index, elapsed, answers), () => FailBoss(def.Monster(), () => PlayLevel(world, index), AppTab.Play));
-                return;
-            }
+            LevelMode mode = LevelModes.For(index);
+            Palette palette = def.IsBoss ? RonrikuTheme.Boss : RonrikuTheme.Worlds[world % RonrikuTheme.Worlds.Length];
+            Figure hero = ShopCatalogue.Build(_profile.Avatar);
+            Figure monster = def.Monster();
+            string title = $"W{world + 1}  ·  {index + 1}  {LevelModes.Name(mode)}";
+            Action<ArcadeResult> done = r => FinishArcadeLevel(world, index, mode, r, palette, monster);
+            _analytics.Track("level_started", new Dictionary<string, string> { ["world"] = world.ToString(), ["level"] = index.ToString(), ["mode"] = mode.ToString().ToLowerInvariant() });
 
-            Palette palette = RonrikuTheme.Worlds[world % RonrikuTheme.Worlds.Length];
-            var context = new TrialScreenContext
+            Music.Play(mode == LevelMode.Crawl ? MusicTrack.HeroRun : def.IsBoss ? MusicTrack.Boss : WorldTrack(world));
+            Music.SetIntensity(1);
+
+            switch (mode)
             {
-                Haptics = _haptics,
-                Back = () => _shell.ShowTab(AppTab.Play),
-                Header = $"W{world + 1}  ·  LEVEL {index + 1}",
-                Footer = $"{LevelDef.WorldNames[world]}  ·  {def.Kind.ToString().ToUpperInvariant()}",
+                case LevelMode.Battle:
+                    _shell.ShowFullscreen(Battle(LevelModes.Battle(def), hero, monster, palette, title, done), palette);
+                    break;
+                case LevelMode.Cards:
+                    _shell.ShowFullscreen(new CharmPickScreen(LevelModes.CharmOffer(def), 1, palette, title, BackToMap, charms =>
+                        _shell.ShowFullscreen(Cards(LevelModes.Cards(def, charms), hero, monster, palette, title, done), palette)), palette);
+                    break;
+                case LevelMode.Dash:
+                    _shell.ShowFullscreen(new DashScreen(LevelModes.Dash(def), hero, palette, title, BackToMap, done), palette);
+                    break;
+                case LevelMode.Crawl:
+                    _shell.ShowFullscreen(new CrawlScreen(LevelModes.Crawl(def), hero, palette, title, BackToMap, done), palette);
+                    break;
+                default:
+                    // Boss: phase 1 battle, phase 2 rune hand with two charms. Stars = the weaker phase.
+                    _shell.ShowFullscreen(Battle(LevelModes.BossBattle(def), hero, monster, palette, title + "  ·  1/2", first =>
+                    {
+                        if (!first.Won)
+                        {
+                            done(first);
+                            return;
+                        }
+                        Music.Stinger(MusicStinger.LevelUp);
+                        _shell.ShowFullscreen(new CharmPickScreen(LevelModes.CharmOffer(def), 2, palette, title + "  ·  2/2", BackToMap, charms =>
+                            _shell.ShowFullscreen(Cards(LevelModes.BossCards(def, charms), hero, monster, palette, title + "  ·  2/2", second => done(new ArcadeResult
+                            {
+                                Won = second.Won,
+                                Stars = Math.Min(first.Stars, second.Stars),
+                                ElapsedMs = first.ElapsedMs + second.ElapsedMs,
+                                Score = first.Score + second.Score,
+                                BestCombo = first.BestCombo,
+                                Proof = first.Proof + "||" + second.Proof
+                            })), palette)), palette);
+                    }), palette);
+                    break;
+            }
+        }
+
+        private BattleScreen Battle(BattleConfig config, Figure hero, Figure monster, Palette palette, string title, Action<ArcadeResult> done)
+        {
+            var screen = new BattleScreen(config, hero, monster, palette, title, BackToMap, done);
+            screen.ComboChanged += combo =>
+            {
+                Music.SetIntensity(combo >= 3 ? 2 : 1);
+                if (combo > 0 && combo % 5 == 0) Music.Stinger(MusicStinger.Combo);
+            };
+            return screen;
+        }
+
+        private CardsScreen Cards(CardsConfig config, Figure hero, Figure monster, Palette palette, string title, Action<ArcadeResult> done)
+        {
+            var screen = new CardsScreen(config, hero, monster, palette, title, BackToMap, done);
+            screen.ScoreLanded += (total, _) =>
+            {
+                bool big = total >= config.Target / 3;
+                Music.SetIntensity(big ? 2 : 1);
+                if (big) Music.Stinger(MusicStinger.Combo);
+                Music.Duck(0.35f, 0.3f);
+            };
+            return screen;
+        }
+
+        private void FinishArcadeLevel(int world, int index, LevelMode mode, ArcadeResult result, Palette palette, Figure monster)
+        {
+            int stars = result.Won ? Mathf.Clamp(result.Stars, 1, 3) : 0;
+            int earned = stars > 0 ? AdventureProgress.Complete(_profile, world, index, stars, result.ElapsedMs) : 0;
+            _analytics.Track(stars > 0 ? "level_won" : "level_lost", new Dictionary<string, string>
+            {
+                ["world"] = world.ToString(), ["level"] = index.ToString(), ["mode"] = mode.ToString().ToLowerInvariant(),
+                ["stars"] = stars.ToString(), ["duration_ms"] = result.ElapsedMs.ToString(), ["best_combo"] = result.BestCombo.ToString()
+            });
+            if (stars > 0)
+            {
+                Save();
+                string modeName = mode.ToString().ToLowerInvariant();
+                Submit("level", () => _online.CompleteArcadeLevel(world, index, modeName, stars, result.ElapsedMs, result.Proof));
+            }
+            Music.Stinger(stars > 0 ? MusicStinger.Victory : MusicStinger.Defeat);
+            Music.SetIntensity(0);
+            bool boss = mode == LevelMode.Boss;
+            _shell.ShowFullscreen(new LevelResultScreen(new LevelResultModel
+            {
+                Won = stars > 0,
+                Boss = boss,
+                Title = monster.Name,
+                Stars = stars,
+                ShardsEarned = earned,
+                ElapsedMs = result.ElapsedMs,
+                Monster = monster,
                 Palette = palette,
-                Monster = def.Monster()
-            };
-            context.Completed = outcome =>
+                NextLabel = boss && stars > 0 ? (world + 1 < LevelDef.WorldCount ? "NEXT WORLD" : "CONTINUE") : "CONTINUE"
+            }, () =>
             {
-                TrackOutcome(new Dictionary<string, string> { ["world"] = world.ToString(), ["level"] = index.ToString() }, outcome);
-                int stars = AdventureProgress.Stars(outcome);
-                int earned = stars > 0 ? AdventureProgress.Complete(_profile, world, index, stars, outcome.ElapsedMilliseconds) : 0;
-                if (stars > 0)
-                {
-                    Save();
-                    Submit("level", () => _online.CompleteLevel(world, index, stars, outcome.ElapsedMilliseconds, new[] { outcome }));
-                }
-                ClearCurrent();
-                _shell.ShowFullscreen(new LevelResultScreen(new LevelResultModel
-                {
-                    Won = stars > 0,
-                    Title = def.Monster().Name,
-                    Stars = stars,
-                    ShardsEarned = earned,
-                    ElapsedMs = outcome.ElapsedMilliseconds,
-                    Monster = def.Monster(),
-                    Palette = palette
-                }, () => _shell.ShowTab(AppTab.Play), () => PlayLevel(world, index)), palette);
-            };
-            ShowTrialScreen(CreateTrial(def.Kind, def.Seed, def.Difficulty, context), palette);
+                if (boss && stars > 0) PlayMapScreen.LastWorld = Mathf.Min(world + 1, LevelDef.WorldCount - 1);
+                BackToMap();
+            }, () => PlayLevel(world, index)), palette);
         }
 
         /// <summary>Runs boss stages one after another; any skipped/failed stage loses the fight.</summary>
@@ -401,32 +494,6 @@ namespace Ronriku.Composition
                 else won(elapsed, answers);
             };
             ShowTrialScreen(CreateTrial(kind, seed, PuzzleDifficulty.Standard, context), RonrikuTheme.Boss);
-        }
-
-        private void FinishWorldBoss(int world, int index, int elapsed, List<TrialOutcome> answers)
-        {
-            LevelDef def = LevelDef.For(world, index);
-            int stars = AdventureProgress.BossStars(answers);
-            int earned = AdventureProgress.Complete(_profile, world, index, stars, elapsed);
-            Save();
-            Submit("world boss", () => _online.CompleteLevel(world, index, stars, elapsed, answers));
-            ClearCurrent();
-            _shell.ShowFullscreen(new LevelResultScreen(new LevelResultModel
-            {
-                Won = true,
-                Boss = true,
-                Title = def.Monster().Name,
-                Stars = stars,
-                ShardsEarned = earned,
-                ElapsedMs = elapsed,
-                Monster = def.Monster(),
-                Palette = RonrikuTheme.Boss,
-                NextLabel = world + 1 < LevelDef.WorldCount ? "NEXT WORLD" : "CONTINUE"
-            }, () =>
-            {
-                PlayMapScreen.LastWorld = Mathf.Min(world + 1, LevelDef.WorldCount - 1);
-                _shell.ShowTab(AppTab.Play);
-            }, null), RonrikuTheme.Boss);
         }
 
         private void FailBoss(Figure monster, Action retry, AppTab back)
@@ -464,6 +531,8 @@ namespace Ronriku.Composition
                 }
                 if (this == null) return;
             }
+            Music.Play(MusicTrack.Boss);
+            Music.SetIntensity(2);
             _analytics.Track("boss_started", new Dictionary<string, string> { ["boss"] = boss.Id });
             PlayBossStages(boss.Name, boss.Monster, boss.Stages(), 0, 0, new List<TrialOutcome>(), (elapsed, answers) =>
             {

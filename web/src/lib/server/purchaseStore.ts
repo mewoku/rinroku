@@ -63,12 +63,13 @@ export function supabasePurchaseStore(db: SupabaseClient): PurchaseStore {
       return data ? fig(data) : null;
     },
     async insertFigure(r) {
-      const { data, error } = await db
+      // Deterministic ids (SOL Legendaries): a concurrent resume may have inserted the row already.
+      const { error } = await db
         .from("figures")
-        .insert({ seed: r.seed, tier: r.tier, encoding: r.encoding, rarity: r.rarity, name: r.name, owner_id: r.userId, source: "sol" })
-        .select("id,name,owner_id,mint_address")
-        .single();
-      if (error || !data) fail("figure insert", error);
+        .upsert({ id: r.id, seed: r.seed, tier: r.tier, encoding: r.encoding, rarity: r.rarity, name: r.name, owner_id: r.userId, source: "sol" }, { onConflict: "id", ignoreDuplicates: true });
+      if (error) fail("figure insert", error);
+      const { data, error: readErr } = await db.from("figures").select("id,name,owner_id,mint_address").eq("id", r.id).single();
+      if (readErr || !data) fail("figure insert", readErr);
       return fig(data);
     },
     async figure(id) {
@@ -80,6 +81,10 @@ export function supabasePurchaseStore(db: SupabaseClient): PurchaseStore {
       const { count, error } = await db.from("listings").select("id", { count: "exact", head: true }).eq("figure_id", figureId).eq("status", "active");
       if (error) fail("listings", error);
       return (count ?? 0) > 0;
+    },
+    async cancelActiveListings(figureId) {
+      const { error } = await db.from("listings").update({ status: "cancelled", closed_at: new Date().toISOString() }).eq("figure_id", figureId).eq("status", "active");
+      if (error) fail("cancel listings", error);
     },
     async boss(id) {
       const { data, error } = await db.from("boss_events").select("id,entry_lamports,starts_at,ends_at,stages").eq("id", id).maybeSingle();

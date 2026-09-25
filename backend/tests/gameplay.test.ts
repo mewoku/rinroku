@@ -1,6 +1,6 @@
 import { dailyPlan, levelDef } from "@ronriku/core";
 import { describe, expect, it } from "vitest";
-import { admin, answerFor, dailyOutcomes, newPlayer, rpc, rpcError, setShards, shards, today, type Player } from "./helpers.ts";
+import { admin, anon, answerFor, dailyOutcomes, newPlayer, rpc, rpcError, setShards, shards, today, type Player } from "./helpers.ts";
 
 const proof = (world: number, level: number) => ({ answers: levelDef(world, level).stages.map(answerFor) });
 const SEED_BOSS = "00000000-0000-4000-8000-00000000b055";
@@ -45,6 +45,32 @@ describe("client payload contract (exact Unity shapes)", () => {
     const p = await newPlayer();
     const outcomes = dailyOutcomes(today()).map((o) => ({ ...o, kind: o.kind.toLowerCase() }));
     expect(await rpc(p.db, "submit_daily", { p_day: today(), p_outcomes: outcomes })).toMatchObject({ counted: true, solved: 3 });
+  });
+});
+
+describe("complete_arcade_level", () => {
+  it("checks the mode layout, unlock order, plausibility and pays first clears once", async () => {
+    const p = await newPlayer();
+    const battle = { p_world: 0, p_level: 0, p_mode: "battle", p_stars: 3, p_elapsed_ms: 30_000, p_proof: "B1:0@2000,1@2500,s0" };
+    expect(await rpc(p.db, "complete_arcade_level", battle)).toMatchObject({ stars: 3, earned: 40, first_clear: true, mode: "battle" });
+    expect(await shards(p.id)).toBe(190);
+    expect(await rpc(p.db, "complete_arcade_level", battle)).toMatchObject({ earned: 0, first_clear: false });
+    // Level 1 is also a battle; level 2 (dash) is locked until level 1 is cleared.
+    expect(await rpcError(p.db, "complete_arcade_level", { ...battle, p_level: 2, p_mode: "dash", p_proof: "D1:0123" })).toMatch(/level_locked/);
+    expect(await rpcError(p.db, "complete_arcade_level", { ...battle, p_level: 1, p_mode: "cards" })).toMatch(/wrong_mode/);
+    expect(await rpcError(p.db, "complete_arcade_level", { ...battle, p_level: 1, p_elapsed_ms: 500 })).toMatch(/implausible_time/);
+    expect(await rpcError(p.db, "complete_arcade_level", { ...battle, p_level: 1, p_proof: "C1:x" })).toMatch(/invalid_proof/);
+    expect(await rpcError(p.db, "complete_arcade_level", { ...battle, p_level: 1, p_stars: 4 })).toMatch(/invalid_stars/);
+    expect(await rpc(p.db, "complete_arcade_level", { ...battle, p_level: 1, p_stars: 1 })).toMatchObject({ earned: 20 });
+    expect(await rpc(p.db, "complete_arcade_level", { ...battle, p_level: 1, p_stars: 2 })).toMatchObject({ earned: 10 });
+    expect(await rpc(p.db, "complete_arcade_level", { p_world: 0, p_level: 2, p_mode: "dash", p_stars: 3, p_elapsed_ms: 9000, p_proof: "D1:0123" }))
+      .toMatchObject({ first_clear: true });
+  });
+
+  it("anonymous callers cannot record arcade clears", async () => {
+    const { data, error } = await anon().rpc("complete_arcade_level", { p_world: 0, p_level: 0, p_mode: "battle", p_stars: 3, p_elapsed_ms: 30000, p_proof: "B1:" });
+    expect(data).toBeNull();
+    expect(error).not.toBeNull();
   });
 });
 

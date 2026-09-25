@@ -10,10 +10,11 @@ export function buildCsp(o: { nonce: string; unity: boolean; dev: boolean; supab
   const script = ["'self'", `'nonce-${o.nonce}'`, "'strict-dynamic'"];
   if (o.unity) script.push("'unsafe-eval'", "'wasm-unsafe-eval'", "blob:");
   else if (o.dev) script.push("'unsafe-eval'");
+  // An empty or "same-origin" Supabase URL is covered by 'self' (CSP3 'self' also matches ws/wss).
+  const supabase = o.supabaseUrl && o.supabaseUrl !== "same-origin" ? [o.supabaseUrl, ws(o.supabaseUrl)] : [];
   const connect = [
     "'self'",
-    o.supabaseUrl,
-    ws(o.supabaseUrl),
+    ...supabase,
     o.rpcUrl,
     ws(o.rpcUrl),
     "https://*.solana.com",

@@ -19,12 +19,15 @@ namespace Ronriku.Presentation.Screens
         private readonly PixelGridElement[] _optionGrids;
         private readonly VisualElement[] _optionButtons;
         private int _chosen = -1;
+        private readonly PatternRule? _rule;
+        private PixelGridElement _testGrid;
 
         public PatternPuzzleScreen(PatternPuzzleData data, TrialScreenContext context)
-            : base(context, "PATTERN", "SAME CHANGE. WHICH ONE COMES OUT?", data.Metadata.TimeLimitSeconds,
+            : base(context, "PATTERN", "WATCH THE CHANGE. DO IT TO THE YELLOW ONE", data.Metadata.TimeLimitSeconds,
                 data.Metadata.ContentHash)
         {
             _data = data;
+            _rule = InferRule(data);
             Body.style.justifyContent = Justify.Center;
 
             float grid = data.Examples.Count > 2 ? 80 : 96;
@@ -63,7 +66,7 @@ namespace Ronriku.Presentation.Screens
             }
             Body.Add(options);
 
-            SetStatus("TAP THE MISSING PIECE", RonrikuTheme.Muted);
+            SetStatus("WHICH ONE DOES YELLOW BECOME?", RonrikuTheme.Muted);
             UpdateCounter();
         }
 
@@ -91,6 +94,21 @@ namespace Ronriku.Presentation.Screens
                 UiFactory.SetBorder(_optionButtons[index], 2, RonrikuTheme.Red);
             }
             MarkFinished(correct, correct ? "EXACTLY" : "NOT THAT ONE  ·  ANSWER IN TEAL", correct ? RonrikuTheme.Teal : RonrikuTheme.Red);
+            if (_testGrid != null && _rule.HasValue)
+                Morph(_testGrid, _data.TestInput, _data.Options[_data.CorrectOption], _rule.Value, () => { });
+        }
+
+        /// <summary>The single primitive that explains every example (Daily/Standard uses one rule).</summary>
+        private static PatternRule? InferRule(PatternPuzzleData data)
+        {
+            foreach (PatternRule rule in (PatternRule[])System.Enum.GetValues(typeof(PatternRule)))
+            {
+                bool fits = true;
+                foreach (var (input, output) in data.Examples)
+                    if (PatternGrid.Apply(rule, input) != output) { fits = false; break; }
+                if (fits) return rule;
+            }
+            return null;
         }
 
         private VisualElement ExampleRow(int input, int output, bool isTest, float size, int index)
@@ -102,6 +120,7 @@ namespace Ronriku.Presentation.Screens
             var left = new PixelGridElement(input, isTest ? RonrikuTheme.Yellow : Palette.Accent);
             left.style.width = left.style.height = size;
             row.Add(left);
+            if (isTest) _testGrid = left;
 
             var arrow = new PixelIcon("play", RonrikuTheme.Muted, 20);
             arrow.style.marginLeft = arrow.style.marginRight = 18;
@@ -112,23 +131,77 @@ namespace Ronriku.Presentation.Screens
             if (isTest) right.SetFrame(RonrikuTheme.Yellow);
             row.Add(right);
 
-            // Loop: the output scans in cell by cell from the input, and the arrow brightens, so the change is visible.
-            float phase = index * 0.45f;
-            row.schedule.Execute(() =>
+            if (isTest)
             {
-                if (_chosen >= 0 || MotionSettings.ReducedMotion) return;
-                float t = Mathf.Repeat(Time.realtimeSinceStartup * 0.55f + phase, 1f);
-                arrow.SetColor(t < 0.35f ? Palette.Accent : RonrikuTheme.Muted);
-                if (isTest)
+                row.schedule.Execute(() =>
                 {
+                    if (_chosen >= 0 || MotionSettings.ReducedMotion) return;
                     right.style.scale = new Scale(Vector3.one * (1f + 0.05f * Mathf.Sin(Time.realtimeSinceStartup * 6f)));
-                    return;
+                }).Every(50);
+                return row;
+            }
+
+            // Each example ACTS OUT its change: the input grid rotates / flips / slides / inverts until it
+            // becomes the output, holds, then resets. Staggered so the rows take turns.
+            if (_rule.HasValue && !MotionSettings.ReducedMotion)
+            {
+                PatternRule rule = _rule.Value;
+                void Loop()
+                {
+                    if (_chosen >= 0 || left.panel == null) return;
+                    left.SetMask(input);
+                    arrow.SetColor(RonrikuTheme.Muted);
+                    left.schedule.Execute(() =>
+                    {
+                        arrow.SetColor(Palette.Accent);
+                        Morph(left, input, output, rule, () => left.schedule.Execute(Loop).StartingIn(1100));
+                    }).StartingIn(700);
                 }
-                // Input and output pulse in turn, reading left → right.
-                left.style.scale = new Scale(Vector3.one * (t < 0.3f ? 1.06f : 1f));
-                right.style.scale = new Scale(Vector3.one * (t >= 0.35f && t < 0.65f ? 1.06f : 1f));
-            }).Every(50);
+                left.schedule.Execute(Loop).StartingIn(300 + index * 900);
+            }
             return row;
+        }
+
+        /// <summary>Animates <paramref name="grid"/> from input to output using the rule's real motion.</summary>
+        private static void Morph(PixelGridElement grid, int input, int output, PatternRule rule, System.Action done)
+        {
+            const float seconds = 0.7f;
+            float start = Time.realtimeSinceStartup;
+            grid.SetMask(input);
+            IVisualElementScheduledItem item = null;
+            item = grid.schedule.Execute(() =>
+            {
+                float t = Mathf.Clamp01((Time.realtimeSinceStartup - start) / seconds);
+                float e = t * t * (3f - 2f * t);
+                switch (rule)
+                {
+                    case PatternRule.Rotate90: grid.style.rotate = new Rotate(90f * e); break;
+                    case PatternRule.Rotate180: grid.style.rotate = new Rotate(180f * e); break;
+                    case PatternRule.Rotate270: grid.style.rotate = new Rotate(-90f * e); break;
+                    case PatternRule.MirrorX: grid.style.scale = new Scale(new Vector3(1f - 2f * e, 1f, 1f)); break;
+                    case PatternRule.MirrorY: grid.style.scale = new Scale(new Vector3(1f, 1f - 2f * e, 1f)); break;
+                    case PatternRule.Transpose:
+                        // Transpose = turn a quarter clockwise, then flip left-right.
+                        if (e < 0.5f) grid.style.rotate = new Rotate(90f * e * 2f);
+                        else
+                        {
+                            grid.style.rotate = new Rotate(90f);
+                            grid.style.scale = new Scale(new Vector3(1f, 1f - 2f * (e - 0.5f) * 2f, 1f));
+                        }
+                        break;
+                    case PatternRule.ShiftRight: grid.style.translate = new Translate(Length.Percent(21f * e), 0); break;
+                    case PatternRule.ShiftDown: grid.style.translate = new Translate(0, Length.Percent(21f * e)); break;
+                    case PatternRule.Invert: grid.style.opacity = 1f - Mathf.Sin(e * Mathf.PI) * 0.85f; if (e > 0.5f) grid.SetMask(output); break;
+                }
+                if (t < 1f) return;
+                item.Pause();
+                grid.style.rotate = new Rotate(0);
+                grid.style.scale = new Scale(Vector3.one);
+                grid.style.translate = new Translate(0, 0);
+                grid.style.opacity = 1f;
+                grid.SetMask(output);
+                done();
+            }).Every(16);
         }
     }
 }

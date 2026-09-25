@@ -3,9 +3,10 @@
 import { useCallback, useState } from "react";
 import bs58 from "bs58";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { PublicKey, SystemProgram, Transaction } from "@solana/web3.js";
+import { Transaction } from "@solana/web3.js";
 import { accessToken } from "@/lib/api";
 import { publicEnv } from "@/lib/env";
+import { inspectPreparedTx } from "@/lib/solana/purchaseTx";
 import { TERMINAL_CODES, postPurchase, removePending, savePending, updatePending, type PendingPurchase } from "@/lib/pendingPurchases";
 import { shortAddress } from "./WalletConnect";
 
@@ -19,23 +20,33 @@ export interface SolPurchaseResult {
 type Item = PendingPurchase["body"]["item"];
 type Ref = { figureId?: string; bossId?: string; day?: number; slot?: number };
 
-interface QuoteResponse {
+interface PrepareResponse {
   ok?: boolean;
   code?: string;
   error?: string;
+  transaction?: string;
+  lastValidBlockHeight?: number;
   lamports?: number;
   wallet?: string;
-  treasury?: string;
+  recipient?: string;
+}
+
+function fromBase64(b64: string): Uint8Array {
+  const bin = atob(b64);
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out;
 }
 
 const LABEL: Record<Item, string> = { "figure-legendary": "Legendary figure", "mint-fee": "Mint to wallet", "boss-entry": "Raid entry" };
 
 /**
- * Pay the treasury on devnet, then ask the server to verify and deliver.
- *  1. server quote (all pre-checks; price comes from the server, M4) — nothing is paid if it fails;
- *  2. connected wallet must be the profile's linked wallet (C2);
- *  3. sign → persist the signature locally → broadcast (H3: always resumable);
- *  4. confirm → POST; a failed POST stays in the resume banner.
+ * One transaction per purchase (see lib/solana/purchaseTx.ts):
+ *  1. server prepare: all pre-checks, price from the server; returns a transaction with the payment to
+ *     the recipient (+ memo, + Core mint for figures) already signed by the server — nothing is paid if it fails;
+ *  2. connected wallet must be the profile's linked wallet (C2) and the transaction is inspected locally;
+ *  3. sign (buyer = fee payer, pays mint rent) → persist the signature locally → broadcast (H3: resumable);
+ *  4. confirm → POST the signature; a failed POST stays in the resume banner.
  */
 export function useSolPurchase() {
   const { connection } = useConnection();
@@ -49,20 +60,26 @@ export function useSolPurchase() {
       if (!token) throw new Error("Sign in (play as guest) before buying with SOL.");
       setBusy(true);
       try {
-        const qs = new URLSearchParams({ item, ...Object.fromEntries(Object.entries(ref).map(([k, v]) => [k, String(v)])) });
-        const q = (await fetch(`/api/purchase/sol?${qs}`, { cache: "no-store", headers: { authorization: `Bearer ${token}` } })
+        const p = (await fetch("/api/purchase/sol/prepare", {
+          method: "POST",
+          cache: "no-store",
+          headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
+          body: JSON.stringify({ item, ...ref }),
+        })
           .then((r) => r.json())
-          .catch(() => null)) as QuoteResponse | null;
-        if (!q?.ok || !q.lamports || !q.wallet || !q.treasury) throw new Error(q?.error ?? "Could not check this purchase — nothing was charged.");
-        if (q.treasury !== publicEnv.treasuryPubkey) throw new Error("Treasury mismatch — refusing to pay.");
-        if (q.wallet !== publicKey.toBase58()) {
-          throw new Error(`Connected wallet ${shortAddress(publicKey.toBase58())} is not your linked wallet ${shortAddress(q.wallet)}. Switch wallets first — nothing was charged.`);
+          .catch(() => null)) as PrepareResponse | null;
+        if (!p?.ok || !p.transaction || !p.lamports || !p.wallet || !p.recipient || !p.lastValidBlockHeight) {
+          throw new Error(p?.error ?? "Could not prepare this purchase — nothing was charged.");
         }
-
-        const tx = new Transaction().add(SystemProgram.transfer({ fromPubkey: publicKey, toPubkey: new PublicKey(q.treasury), lamports: q.lamports }));
-        const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
-        tx.recentBlockhash = blockhash;
-        tx.feePayer = publicKey;
+        if (!publicEnv.paymentRecipient || p.recipient !== publicEnv.paymentRecipient) throw new Error("Payment recipient mismatch — refusing to pay.");
+        if (p.wallet !== publicKey.toBase58()) {
+          throw new Error(`Connected wallet ${shortAddress(publicKey.toBase58())} is not your linked wallet ${shortAddress(p.wallet)}. Switch wallets first — nothing was charged.`);
+        }
+        const tx = Transaction.from(fromBase64(p.transaction));
+        const problem = inspectPreparedTx(tx, { buyer: p.wallet, recipient: p.recipient, lamports: p.lamports, mint: item !== "boss-entry" });
+        if (problem) throw new Error(`${problem} Nothing was charged.`);
+        const blockhash = tx.recentBlockhash!;
+        const lastValidBlockHeight = p.lastValidBlockHeight;
 
         let signature: string;
         const body = { item, ...ref } as PendingPurchase["body"];

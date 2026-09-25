@@ -1,0 +1,75 @@
+# Single origin for RONRIKU:
+#   /rest/v1 /auth/v1 /functions/v1 /storage/v1 /realtime/v1  → Supabase Kong
+#   /unity/*                                                    → Unity WebGL files (mounted, served here)
+#   everything else                                             → Next.js (web:3000)
+#
+# DOMAIN: a real hostname (e.g. play.example.com) → automatic HTTPS (Let's Encrypt) on :80/:443.
+#         ":80" → plain HTTP on every host name (local use; compose maps it to 127.0.0.1:8080).
+{
+	admin off
+}
+
+{$DOMAIN::80} {
+	# Page CSP is per-request (nonce) from Next's middleware; API/static CSP from next.config.ts.
+	# Only defaults are set here so Caddy never overrides what the app sends.
+	header {
+		-Server
+		-X-Powered-By
+		?X-Content-Type-Options "nosniff"
+		?Referrer-Policy "strict-origin-when-cross-origin"
+		?X-Frame-Options "DENY"
+		?Permissions-Policy "camera=(), microphone=(), geolocation=()"
+		# Ignored by browsers over plain HTTP; enforced once the site is served over HTTPS.
+		Strict-Transport-Security "max-age=31536000"
+	}
+
+	# Compress text only; Unity .br/.gz/.unityweb payloads are already compressed.
+	encode {
+		zstd
+		gzip
+		match {
+			header Content-Type text/*
+			header Content-Type application/json*
+			header Content-Type application/javascript*
+			header Content-Type image/svg+xml*
+		}
+	}
+
+	@supabase path /rest/v1/* /auth/v1/* /functions/v1/* /storage/v1/* /realtime/v1/*
+	handle @supabase {
+		reverse_proxy {$SUPABASE_UPSTREAM:supabase_kong_ronriku:8000}
+	}
+
+	handle /unity/* {
+		root * /srv
+		# Unity names files without content hashes: revalidate (ETag / Last-Modified → 304).
+		header Cache-Control "no-cache"
+		header Content-Security-Policy "default-src 'none'; frame-ancestors 'none'; base-uri 'none'"
+
+		# Pre-compressed builds without decompression fallback (same rules as next.config.ts).
+		@br path *.br
+		header @br Content-Encoding br
+		@gz path *.gz
+		header @gz Content-Encoding gzip
+		@wasm path *.wasm *.wasm.br *.wasm.gz
+		header @wasm Content-Type application/wasm
+		@js path *.js.br *.js.gz
+		header @js Content-Type application/javascript
+		@data path *.data *.data.br *.data.gz
+		header @data Content-Type application/octet-stream
+		# Decompression-fallback builds (.unityweb): the loader decompresses; no Content-Encoding.
+		@unityweb path *.unityweb
+		header @unityweb Content-Type application/octet-stream
+
+		file_server
+	}
+
+	handle {
+		reverse_proxy web:3000
+	}
+
+	log {
+		output stdout
+		format console
+	}
+}

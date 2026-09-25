@@ -86,7 +86,8 @@ namespace Ronriku.Presentation.Screens
 
             scroll.Add(Section("SETTINGS"));
             var settings = UiFactory.Panel();
-            settings.Add(ToggleRow("SOUND", Feedback.SoundEnabled, v => Feedback.SoundEnabled = v));
+            settings.Add(ToggleRow("MUSIC", Ronriku.Presentation.Audio.Music.Enabled, v => Ronriku.Presentation.Audio.Music.Enabled = v));
+            settings.Add(ToggleRow("SOUND FX", Feedback.SoundEnabled, v => Feedback.SoundEnabled = v));
             settings.Add(ToggleRow("HAPTICS", hapticsEnabled, setHaptics));
             settings.Add(ToggleRow(Tilt.Available ? "GYRO PARALLAX" : "GYRO  ·  NO SENSOR", MotionSettings.GyroEnabled && Tilt.Available,
                 v => MotionSettings.GyroEnabled = v, Tilt.Available));

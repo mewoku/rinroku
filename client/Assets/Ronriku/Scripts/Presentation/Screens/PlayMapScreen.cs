@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using Ronriku.Domain.Adventure;
+using Ronriku.Domain.Arcade;
 using Ronriku.Domain.Daily;
 using Ronriku.Domain.Figures;
 using Ronriku.Domain.Player;
@@ -214,7 +215,7 @@ namespace Ronriku.Presentation.Screens
             Color accent = boss ? RonrikuTheme.Red : palette.Accent;
             node.style.backgroundColor = unlocked ? RonrikuTheme.WithAlpha(RonrikuTheme.Surface2, 0.95f) : RonrikuTheme.WithAlpha(RonrikuTheme.Surface, 0.7f);
             UiFactory.SetBorder(node, boss ? 3 : 2, record != null ? accent : unlocked ? Color.Lerp(accent, Color.white, 0.2f) : RonrikuTheme.Line);
-            string icon = !unlocked ? "lock" : boss ? "boss" : def.Kind == TrialKind.Pattern ? "pattern" : def.Kind == TrialKind.Spatial ? "cube" : "link";
+            string icon = !unlocked ? "lock" : boss ? "boss" : ModeIcon(LevelModes.For(index));
             node.Add(new PixelIcon(icon, unlocked ? accent : RonrikuTheme.Muted, boss ? 30 : 22));
             if (unlocked && record == null) UiFactory.AttachGlow(node, accent, 0.5f, 0.5f);
 
@@ -311,7 +312,8 @@ namespace Ronriku.Presentation.Screens
             info.style.flexGrow = 1;
             info.style.marginLeft = 12;
             info.style.justifyContent = Justify.Center;
-            var tag = UiFactory.Heading(def.IsBoss ? "WORLD BOSS" : $"LEVEL {index + 1}  ·  {KindName(def.Kind)}", 10, palette.Accent);
+            LevelMode mode = LevelModes.For(index);
+            var tag = UiFactory.Heading(def.IsBoss ? "WORLD BOSS" : $"LEVEL {index + 1}  ·  {LevelModes.Name(mode)}", 10, palette.Accent);
             tag.style.unityTextAlign = TextAnchor.MiddleLeft;
             info.Add(tag);
             var title = UiFactory.Heading(monster.Name, 20, RonrikuTheme.Text);
@@ -319,7 +321,7 @@ namespace Ronriku.Presentation.Screens
             title.style.marginTop = 4;
             info.Add(title);
             var sub = UiFactory.Label(record != null ? $"BEST {record.stars}/3 STARS  ·  REPLAY" :
-                def.IsBoss ? "3 STAGES  ·  +300 SHARDS" : $"+{Economy.LevelBase}–{Economy.LevelBase + 2 * Economy.StarBonus} SHARDS", 11, RonrikuTheme.Muted);
+                def.IsBoss ? $"{LevelModes.Hint(mode)}  ·  +300" : $"{LevelModes.Hint(mode)}  ·  +{Economy.LevelBase}", 11, RonrikuTheme.Muted);
             sub.style.unityTextAlign = TextAnchor.MiddleLeft;
             sub.style.marginTop = 2;
             info.Add(sub);
@@ -380,7 +382,13 @@ namespace Ronriku.Presentation.Screens
             return shard;
         }
 
-        private static string KindName(TrialKind kind) => kind == TrialKind.Logic ? "LINK" : kind.ToString().ToUpperInvariant();
+        private static string ModeIcon(LevelMode mode) => mode switch
+        {
+            LevelMode.Cards => "hand",
+            LevelMode.Dash => "gem",
+            LevelMode.Crawl => "note",
+            _ => "bolt"
+        };
     }
 
     /// <summary>Chunky dotted pixel path between map nodes; cleared segments glow in the world accent.</summary>

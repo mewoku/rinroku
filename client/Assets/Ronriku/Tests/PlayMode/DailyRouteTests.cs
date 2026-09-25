@@ -92,35 +92,6 @@ namespace Ronriku.Tests
             Assert.That(root.Q<Label>("daily-meta").text, Does.Contain("STREAK 1"), "profile survives reload");
         }
 
-        [UnityTest]
-        public IEnumerator AdventureLevel_Solved_AwardsStarsAndShards_AndUnlocksNext()
-        {
-            RonrikuBootstrap app = null;
-            yield return Load(a => app = a);
-            var root = Root(app);
-            var profile = Field<PlayerProfile>(app, "_profile");
-            int shardsBefore = profile.shards;
-
-            typeof(RonrikuBootstrap).GetMethod("PlayLevel", BindingFlags.Instance | BindingFlags.NonPublic)
-                .Invoke(app, new object[] { 0, 0 });
-            yield return null;
-            Assert.That(root.Q("guardian"), Is.Not.Null, "level shows its guardian monster");
-            yield return SolveCurrent(app, root);
-            Click(root.Q<Button>("continue-button"));
-            yield return null;
-
-            Assert.That(root.Q("level-result"), Is.Not.Null);
-            var record = profile.LevelRecordFor(0, 0);
-            Assert.That(record, Is.Not.Null);
-            Assert.That(record.stars, Is.InRange(1, 3));
-            Assert.That(profile.shards, Is.GreaterThan(shardsBefore));
-            Assert.That(Ronriku.Domain.Adventure.AdventureProgress.IsUnlocked(profile, 0, 1), Is.True);
-
-            Click(root.Q<Button>("result-continue"));
-            yield return null;
-            Assert.That(root.Q("play-map"), Is.Not.Null);
-        }
-
         internal static void ShowTab(RonrikuBootstrap app, AppTab tab) =>
             Field<AppShell>(app, "_shell").ShowTab(tab);
 

@@ -1,0 +1,23 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1f9acfda77e75594db5ff3a40d6108a3, type: 3}
+  m_Name: RonrikuTuning
+  m_EditorClassIdentifier: Ronriku.Runtime::Ronriku.Presentation.RonrikuTuning
+  shake: 1
+  popupScale: 1
+  sfxVolume: 1
+  staggerMs: 2500
+  resolveRightMs: 620
+  resolveWrongMs: 1150
+  musicBeatsPerMove: 2
+  beatWindow: 0.28
+  fallbackSecondsPerMove: 0.8

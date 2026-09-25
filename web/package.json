@@ -10,7 +10,8 @@
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "create-treasury": "tsx scripts/create-treasury.ts"
+    "create-mint-authority": "tsx scripts/create-mint-authority.ts",
+    "devnet-dry-run": "tsx scripts/devnet-dry-run.ts"
   },
   "dependencies": {
     "@noble/hashes": "^1.8.0",

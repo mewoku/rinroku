@@ -1,40 +1,42 @@
 import "server-only";
 
-import { createHmac } from "node:crypto";
-import { createUmi } from "@metaplex-foundation/umi-bundle-defaults";
-import { create, mplCore } from "@metaplex-foundation/mpl-core";
-import { createSignerFromKeypair, keypairIdentity, publicKey, type Umi } from "@metaplex-foundation/umi";
-import { publicEnv } from "../env";
+import { Keypair, PublicKey } from "@solana/web3.js";
 import type { ChainDeps } from "./purchase";
-import { verifyTransfer } from "./solana";
-
-function umiFor(treasurySecret: Uint8Array): Umi {
-  const umi = createUmi(publicEnv.solanaRpcUrl, { commitment: "confirmed" }).use(mplCore());
-  umi.use(keypairIdentity(umi.eddsa.createKeypairFromSecretKey(treasurySecret)));
-  return umi;
-}
+import { devnetConnection, PAYMENT_COMMITMENT } from "./solana";
+import { assetKeypair, buildPurchaseTx, legendaryFigureId, serializePartial, userTag } from "../solana/buildPurchaseTx";
+import { checkPurchaseTx, purchaseMemo } from "../solana/purchaseTx";
 
 /**
- * Deterministic per-figure asset keypair: HMAC(treasury secret, figure id). The address is fixed for
- * a figure, so a second `create` for the same figure fails on-chain (account already exists) — a
- * figure can never be minted twice, even by concurrent retries. Not guessable without the secret.
+ * web3.js + Metaplex Core bindings for the purchase flow. The mint authority only *signs*
+ * (memo + Core create authority + asset keypair derivation); the buyer pays every fee and rent.
  */
-function assetKeypair(umi: Umi, treasurySecret: Uint8Array, figureId: string) {
-  const seed = createHmac("sha256", Buffer.from(treasurySecret)).update(`ronriku:core-asset:v1:${figureId}`).digest();
-  return umi.eddsa.createKeypairFromSeed(new Uint8Array(seed));
-}
-
-/** Umi / Metaplex Core + web3 bindings for the purchase flow. */
-export function solanaChain(treasurySecret: Uint8Array): ChainDeps {
-  const umi = umiFor(treasurySecret);
+export function solanaChain(authoritySecret: Uint8Array): ChainDeps {
+  const authority = Keypair.fromSecretKey(authoritySecret);
+  const connection = devnetConnection();
+  const assetKp = (figureId: string) => assetKeypair(authoritySecret, figureId);
   return {
-    verifyTransfer,
-    assetAddress: (figureId) => assetKeypair(umi, treasurySecret, figureId).publicKey.toString(),
-    assetExists: (address) => umi.rpc.accountExists(publicKey(address), { commitment: "confirmed" }),
-    async mint({ figureId, owner, name, uri }) {
-      const asset = createSignerFromKeypair(umi, assetKeypair(umi, treasurySecret, figureId));
-      await create(umi, { asset, name: name.slice(0, 32), uri, owner: publicKey(owner) }).sendAndConfirm(umi, { confirm: { commitment: "confirmed" } });
-      return asset.publicKey.toString();
+    authority: authority.publicKey.toBase58(),
+    assetAddress: (figureId) => assetKp(figureId).publicKey.toBase58(),
+    legendaryFigureId: (userId, day, slot) => legendaryFigureId(authoritySecret, userId, day, slot),
+    memo: (userId, kind, ref) => purchaseMemo(kind, ref, userTag(authoritySecret, userId)),
+    assetExists: async (address) => (await connection.getAccountInfo(new PublicKey(address), PAYMENT_COMMITMENT)) !== null,
+    async buildTx({ buyer, recipient, lamports, memo, mint }) {
+      const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash(PAYMENT_COMMITMENT);
+      const tx = buildPurchaseTx({
+        buyer,
+        recipient,
+        lamports,
+        memo,
+        authority,
+        mint: mint && { asset: assetKp(mint.figureId), name: mint.name, uri: mint.uri },
+        blockhash,
+        lastValidBlockHeight,
+      });
+      return { transaction: serializePartial(tx), lastValidBlockHeight };
+    },
+    async verifyTx(signature, expected) {
+      const tx = await connection.getParsedTransaction(signature, { commitment: PAYMENT_COMMITMENT, maxSupportedTransactionVersion: 0 });
+      return checkPurchaseTx(tx, expected);
     },
   };
 }

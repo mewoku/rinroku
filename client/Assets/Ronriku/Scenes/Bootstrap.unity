@@ -149,6 +149,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 62ea7b640d46032469d72494bce04f7b, type: 3}
   m_Name: 
   m_EditorClassIdentifier: Ronriku.Runtime::Ronriku.Composition.RonrikuBootstrap
+  tuning: {fileID: 11400000, guid: 320562bf9bcb67d41b5e7a94998b3eae, type: 2}
 --- !u!114 &330798262
 MonoBehaviour:
   m_ObjectHideFlags: 0

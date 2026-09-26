@@ -77,6 +77,10 @@ namespace Ronriku.Editor
         private static void Build(string fileName, BuildOptions buildOptions)
         {
             Verify();
+            // Development builds may talk to the adb-reversed http dev backend; store builds may not.
+            PlayerSettings.insecureHttpOption = BackendIsCleartext((buildOptions & BuildOptions.Development) != 0)
+                ? InsecureHttpOption.AlwaysAllowed : InsecureHttpOption.NotAllowed;
+            RonrikuIcon.TryApply(logSuccess: false);
             string output = Path.GetFullPath(Path.Combine(Application.dataPath, "../../Builds/Android", fileName));
             Directory.CreateDirectory(Path.GetDirectoryName(output) ?? throw new InvalidOperationException());
             // Always write a fresh file: in-place APK updates leave dead space between zip entries.
@@ -116,7 +120,7 @@ namespace Ronriku.Editor
 
             // Cleartext HTTP only when the configured backend is http:// (local dev via adb reverse);
             // an https:// backend turns it off automatically. See docs/RISKS.md.
-            PlayerSettings.insecureHttpOption = BackendIsCleartext() ? InsecureHttpOption.AlwaysAllowed : InsecureHttpOption.NotAllowed;
+            PlayerSettings.insecureHttpOption = BackendIsCleartext(false) ? InsecureHttpOption.AlwaysAllowed : InsecureHttpOption.NotAllowed;
             ConfigureSigning();
 
             // Size: strip unused engine and managed code; Ronriku.Runtime is preserved by link.xml.
@@ -134,10 +138,14 @@ namespace Ronriku.Editor
             PlayerSettings.SetStackTraceLogType(LogType.Exception, StackTraceLogType.ScriptOnly);
         }
 
-        private static bool BackendIsCleartext()
+        /// <summary>Plain HTTP only when the backend this build will actually use is http://.</summary>
+        private static bool BackendIsCleartext(bool development)
         {
-            var config = AssetDatabase.LoadAssetAtPath<TextAsset>("Assets/Ronriku/Resources/ronriku-online.json");
-            return config != null && config.text.Contains("\"http://");
+            var asset = AssetDatabase.LoadAssetAtPath<TextAsset>("Assets/Ronriku/Resources/ronriku-online.json");
+            if (asset == null) return false;
+            var config = JsonUtility.FromJson<Ronriku.Infrastructure.Online.OnlineConfig>(asset.text);
+            string url = !development && config.releaseUrl != null ? config.releaseUrl : config.url;
+            return !string.IsNullOrEmpty(url) && url.StartsWith("http://");
         }
 
         /// <summary>

@@ -225,7 +225,7 @@ namespace Ronriku.Presentation.Arcade
             _swingMs = Mathf.Max(0, _swingMs - StaggerMs);
             _score.PunchChips(hit.Chips + hit.SpeedBonus);
             schedule.Execute(() => _score.PunchMult(hit.Mult)).StartingIn(110);
-            if (hit.SpeedBonus >= 7) Juice.Popup(_overlay, _overlay.WorldToLocal(_score.worldBound.center) + new Vector2(-40, -10), "FAST!", RonrikuTheme.Teal, 16, 40f, 0.7f);
+            if (hit.SpeedBonus >= 7) Juice.Popup(_overlay, _overlay.WorldToLocal(_score.worldBound.center) + new Vector2(0, -46), "FAST!", RonrikuTheme.Teal, 16, 40f, 0.7f);
             schedule.Execute(() =>
             {
                 _arena.HeroAttack();

@@ -31,12 +31,18 @@ namespace Ronriku.Infrastructure.Online
         /// Supabase API paths, see deploy/Caddyfile), so the browser never needs a cross-origin call.
         /// </summary>
         public string webUrl = "same-origin";
+        /// <summary>
+        /// Backend for non-development player builds (store APK). Empty = the release plays fully offline
+        /// until a public HTTPS backend exists; null/missing = same as <see cref="url"/>.
+        /// </summary>
+        public string releaseUrl;
 
         public static OnlineConfig Load()
         {
             var asset = Resources.Load<TextAsset>("ronriku-online");
             if (asset == null) return null;
             var config = JsonUtility.FromJson<OnlineConfig>(asset.text);
+            if (!Application.isEditor && !Debug.isDebugBuild && config.releaseUrl != null) config.url = config.releaseUrl;
             if (Application.platform == RuntimePlatform.WebGLPlayer && !string.IsNullOrEmpty(config.webUrl))
                 config.url = config.webUrl == "same-origin" ? Origin(Application.absoluteURL) ?? config.url : config.webUrl;
             return config;

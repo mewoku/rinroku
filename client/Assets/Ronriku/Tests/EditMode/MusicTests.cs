@@ -112,6 +112,63 @@ namespace Ronriku.Tests
         }
 
         [Test]
+        public void FunkTracks_Swing_Between55And60Percent_WithExtendedChords()
+        {
+            foreach (MusicTrack track in SongBook.All)
+            {
+                if (!SongBook.IsFunk(track)) continue;
+                SongSpec spec = SongBook.Get(track);
+                Assert.That(spec.SwingRatio, Is.InRange(0.549f, 0.601f), $"{track} swing");
+                int extended = 0;
+                foreach (Chord c in spec.Progression) if (c.Tones.Length >= 4) extended++;
+                Assert.That(extended, Is.GreaterThanOrEqualTo(3), $"{track} 7th/9th voicings");
+                Groove g = spec.Groove;
+                Assert.That(g.GhostSnare.Contains("g"), Is.True, $"{track} ghost snares");
+                Assert.That(g.Bass[0].Contains("O") || g.Bass[0].Contains("7"), Is.True, $"{track} octave pops");
+                Assert.That(g.Clav.Contains("x"), Is.True, $"{track} clav stabs");
+                Assert.That(g.Brass.Contains("x"), Is.True, $"{track} brass stabs");
+            }
+        }
+
+        [Test]
+        public void Worlds_EachHaveADistinctGroove()
+        {
+            var styles = new HashSet<GrooveStyle>();
+            foreach (MusicTrack t in new[] { MusicTrack.World1, MusicTrack.World2, MusicTrack.World3, MusicTrack.World4, MusicTrack.World5 })
+                Assert.That(styles.Add(SongBook.Get(t).Style), Is.True, $"{t} groove repeats");
+        }
+
+        [Test]
+        public void SwungTracks_PlaceOffSixteenthHatsLate()
+        {
+            foreach (MusicTrack track in new[] { MusicTrack.World2, MusicTrack.World3, MusicTrack.Daily })
+            {
+                var job = Render(track);
+                float[] drive = job.Stems[1];
+                int offset = (int)(job.Spec.Swing * job.StepLen);
+                Assert.That(offset, Is.GreaterThan(100), $"{track} swing offset");
+                double early = 0, late = 0;
+                for (int step = 1; step < drive.Length / job.StepLen; step += 2)
+                {
+                    int straight = step * job.StepLen;
+                    early += HighEnergy(drive, straight, offset);
+                    late += HighEnergy(drive, straight + offset, offset);
+                }
+                // the swung hat starts at straight + offset, so the high band is much busier after it than before it
+                Assert.That(late, Is.GreaterThan(early * 1.5), $"{track} hats swing late");
+            }
+        }
+
+        [Test]
+        public void HeroRun_StaysStraightFourOnTheFloor_At140()
+        {
+            SongSpec spec = SongBook.Get(MusicTrack.HeroRun);
+            Assert.That(SongRenderJob.EffectiveBpm(spec), Is.EqualTo(140.0).Within(0.1));
+            foreach (string bar in spec.Groove.Kick)
+                for (int beat = 0; beat < 4; beat++) Assert.That(bar[beat * 4], Is.EqualTo('x'));
+        }
+
+        [Test]
         public void Stingers_Render_InRange()
         {
             foreach (MusicStinger s in Enum.GetValues(typeof(MusicStinger)))
@@ -143,6 +200,18 @@ namespace Ronriku.Tests
                 Assert.That(Music.Current, Is.EqualTo(MusicTrack.None));
                 Assert.That(Music.Bpm, Is.EqualTo(0f));
             });
+        }
+
+        private static double HighEnergy(float[] data, int from, int count)
+        {
+            double sum = 0;
+            for (int i = 0; i < count; i++)
+            {
+                int k = (from + i) % data.Length;
+                float d = data[k] - data[(k + data.Length - 1) % data.Length]; // first difference ~ high-pass
+                sum += d * d;
+            }
+            return sum;
         }
 
         private static double Energy(float[] data, int from, int count)

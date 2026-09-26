@@ -31,6 +31,30 @@ namespace Ronriku.Presentation.Audio
         }
     }
 
+    /// <summary>RBJ biquad (direct form I). A struct so filter state is copied explicitly between work steps.</summary>
+    internal struct Biquad
+    {
+        private float _b0, _b1, _b2, _a1, _a2, _x1, _x2, _y1, _y2;
+
+        public static Biquad HighPass(float hz, float q)
+        {
+            float w = Dsp.TwoPi * hz / Dsp.Rate, cos = MathF.Cos(w), alpha = MathF.Sin(w) / (2f * q);
+            float a0 = 1f + alpha;
+            return new Biquad
+            {
+                _b0 = (1f + cos) / 2f / a0, _b1 = -(1f + cos) / a0, _b2 = (1f + cos) / 2f / a0,
+                _a1 = -2f * cos / a0, _a2 = (1f - alpha) / a0,
+            };
+        }
+
+        public float Process(float x)
+        {
+            float y = _b0 * x + _b1 * _x1 + _b2 * _x2 - _a1 * _y1 - _a2 * _y2;
+            _x2 = _x1; _x1 = x; _y2 = _y1; _y1 = y;
+            return y;
+        }
+    }
+
     /// <summary>Band-limited-ish chiptune oscillators, one-pole filters and saturation.</summary>
     internal static class Dsp
     {

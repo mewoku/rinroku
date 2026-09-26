@@ -33,3 +33,8 @@ node_modules/
 
 # Music renders from RONRIKU/Export Music WAVs (large, regenerable)
 docs/evidence/audio/
+
+# Recorded gameplay (client Tests/PlayMode/FootageTests) and rendered ads: regenerable, large
+marketing/video/public/clips/
+marketing/video/out/
+marketing/video/node_modules/

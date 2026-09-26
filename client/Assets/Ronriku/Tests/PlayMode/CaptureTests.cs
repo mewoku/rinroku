@@ -15,6 +15,13 @@ namespace Ronriku.Tests
     /// Renders the Daily flow into offscreen textures at representative portrait aspect ratios and
     /// writes PNG evidence to docs/evidence. Run with: scripts/unity-test.ps1 -Platform PlayMode -Category Capture
     /// </summary>
+    internal static class ArcadeRouteTestsAccess
+    {
+        public static System.Collections.Generic.List<int> SolveDash(Ronriku.Domain.Arcade.DashLevel level) =>
+            (System.Collections.Generic.List<int>)typeof(ArcadeRouteTests).GetMethod("Solve", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static)
+                .Invoke(null, new object[] { level });
+    }
+
     [Category("Capture")]
     public sealed class CaptureTests
     {
@@ -155,7 +162,25 @@ namespace Ronriku.Tests
                 yield return Settle();
                 Save(target, folder, "arcade", "6-ice-dash");
 
+                var dash = root.Q<Ronriku.Presentation.Arcade.DashScreen>();
+                dash.State.Restart();
+                foreach (int dir in ArcadeRouteTestsAccess.SolveDash(dash.State.Level))
+                {
+                    dash.Move(dir);
+                    yield return new WaitForSecondsRealtime(0.7f);
+                }
+                yield return new WaitForSecondsRealtime(1.6f);
+                yield return Settle();
+                Save(target, folder, "arcade", "6b-result");
+
+                RuntimeConfig.SkipHowTo = false;
+                PlayerPrefs.DeleteKey("ronriku.howto.Crawl");
                 play.Invoke(app, new object[] { 2, 9 });
+                yield return new WaitForSecondsRealtime(0.8f);
+                yield return Settle();
+                Save(target, folder, "arcade", "7a-howto");
+                DailyRouteTests.Click(root.Q<Button>("howto-go"));
+                RuntimeConfig.SkipHowTo = true;
                 yield return new WaitForSecondsRealtime(2.2f);
                 yield return Settle();
                 Save(target, folder, "arcade", "7-beat-crawl");

@@ -1,0 +1,100 @@
+# RONRIKU — Solana dApp Store listing data.
+#
+# NOTE (checked 2026-09-26): the dapp-store CLI no longer reads this file. The legacy
+# init/create/validate/publish flows were removed; new apps are created in the Publisher Portal
+# (https://publish.solanamobile.com) and new versions are published with
+#   dapp-store --apk-file <apk> --keypair <publisher.json> --whats-new "..."
+# This file keeps the listing data in the legacy schema so every portal field has one source of truth
+# (and it still works with the legacy CLI if you pin an old version). Paths are relative to store/dapp-store/.
+#
+# Fill every {{...}} before submitting. Never put keypairs or API keys in this file.
+
+publisher:
+  name: RONRIKU
+  website: "{{https://your-domain}}"
+  email: "{{publisher email}}"
+  support_email: "{{support email}}"
+
+app:
+  name: RONRIKU
+  address: ""                       # App NFT mint, filled in by the portal / legacy CLI
+  android_package: com.ronriku.game
+  urls:
+    license_url: "{{https://your-domain}}/terms"
+    copyright_url: "{{https://your-domain}}/terms"
+    privacy_policy_url: "{{https://your-domain}}/privacy"
+    website: "{{https://your-domain}}"
+  media:
+    - purpose: icon
+      uri: ../media/icon-512.png
+
+release:
+  address: ""                       # Release NFT mint, one per version
+  media:
+    - purpose: icon
+      uri: ../media/icon-512.png
+    - purpose: banner
+      uri: ../media/banner-1200x600.png
+    - purpose: featureGraphic
+      uri: ../media/feature-1200x1200.png
+    - purpose: screenshot
+      uri: ../media/screenshots/1080x2400/01.png
+    - purpose: screenshot
+      uri: ../media/screenshots/1080x2400/02.png
+    - purpose: screenshot
+      uri: ../media/screenshots/1080x2400/03.png
+    - purpose: screenshot
+      uri: ../media/screenshots/1080x2400/04.png
+    - purpose: screenshot
+      uri: ../media/screenshots/1080x2400/05.png
+  files:
+    - purpose: install
+      uri: ../../Builds/Android/RONRIKU.apk   # must be release-signed with the dApp Store key (not debug)
+  catalog:
+    en-US:
+      name: RONRIKU
+      short_description: Pixel puzzle arcade adventure   # 29 chars; dApp Store limit is 30
+      long_description: |
+        Beat monsters with your brain.
+
+        RONRIKU is a pixel-art puzzle arcade. Walk a map of five worlds, meet voxel monsters and knock them out with fast little puzzles, then come back every day for three fresh reasoning trials.
+
+        FIVE WORLDS, SIXTY LEVELS
+        Every world mixes four kinds of play, then ends in a two-phase boss fight.
+        • Battle: 3–10 second micro-puzzles (next in sequence, odd one out, sums, memory, mirror, arrows, scales). Right answers are attacks; chain them for combo multipliers before the monster swings.
+        • Rune Hand: a deck-building duel. Play combos from a hand of runes, pick a charm that bends the scoring, and beat the monster's HP with chips × mult.
+        • Ice Dash: swipe and slide until you hit a wall. Grab every gem, dodge the spikes, find the door. Three stars at par.
+        • Beat Crawl: a rhythm dungeon. Monsters move on the music's beat, and so do you. Stay on beat for combos.
+
+        THE DAILY
+        Three trials a day, the same for every player: Pattern (what comes out?), Shadow and Link. Keep your streak alive and climb the rating ladder.
+
+        BOSS RAIDS
+        Weekly bosses chain three trials against the clock. Pay with shards, win rewards.
+
+        COLLECT VOXEL HEROES
+        Earn shards by playing and spend them in the daily shop on hand-built voxel figures. Equip your favourite as your avatar.
+
+        MADE FOR THE PHONE
+        Portrait, one-handed, haptics, a procedural chiptune soundtrack that reacts to your combos, and a gravity-sensor parallax that makes the pixels float. Tuned for Solana Seeker.
+
+        PLAYS OFFLINE
+        The whole game works without a connection. When online, an anonymous account (no email, no password) keeps your progress, rating and friends, and the server checks results so leaderboards stay fair.
+
+        ABOUT SOLANA
+        The Android app has no wallet features and never asks for your keys. On the RONRIKU website you can optionally link a wallet and buy figures with devnet SOL; those figures are minted as Metaplex Core NFTs on Solana devnet, a test network with no real money. Nothing in RONRIKU is an investment.
+
+        No ads. No tracking. No pay-to-win.
+      new_in_version: First release — five worlds of arcade puzzle battles, Rune Hand duels, Ice Dash and Beat Crawl, a daily three-trial challenge, weekly bosses, voxel figures and a reactive chiptune soundtrack.
+      saga_features: Tuned for the Seeker's 20:9 display and haptics. No in-app wallet yet; optional devnet figure purchases and wallet linking happen on the RONRIKU website.
+  android_details:
+    locales:
+      - en-US
+
+solana_mobile_dapp_publisher_portal:
+  google_store_package: ""          # set only if the app is also on Google Play under another package
+  testing_instructions: >-
+    No login needed. Launch the app and tap PLAY: the adventure map opens at World 1 Level 1 (Battle).
+    Levels unlock in order. DAILY runs today's three trials. Everything works offline; online accounts are
+    anonymous and created automatically when the server is reachable. The app has no wallet connection and
+    no purchases with real money.

@@ -1,7 +1,8 @@
 {
-  "_comment": "Local development backend. The anon key is the standard public Supabase CLI dev key, not a secret. Replace both for production.",
+  "_comment": "url = dev backend (adb reverse). releaseUrl = store builds: empty plays offline until the HTTPS VPS exists, then set it to https://<domain> and the production anon key. webUrl = WebGL on the website (same-origin proxy).",
   "url": "http://127.0.0.1:54321",
   "anonKey": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0",
   "timeoutSeconds": 6,
-  "webUrl": "same-origin"
+  "webUrl": "same-origin",
+  "releaseUrl": ""
 }

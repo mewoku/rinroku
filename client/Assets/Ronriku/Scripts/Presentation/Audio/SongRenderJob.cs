@@ -8,9 +8,11 @@ namespace Ronriku.Presentation.Audio
     /// no threads, so it works on WebGL and in EditMode tests. Work is split into small steps so the host can
     /// spread rendering over frames; <see cref="RenderAll"/> runs it synchronously.
     ///
-    /// Stem 0 "base"  (4 bars): kick, light hats, pumping bass, pumping pad          -> intensity 0
-    /// Stem 1 "drive" (4 bars): clap/snare, 16th hats, open hats, echoed arp         -> added at intensity 1
-    /// Stem 2 "hype"  (8 bars): echoed lead (AABA-ish), shaker/perc, crash, riser+fill -> added at intensity 2
+    /// Stem 0 "base"  (4 bars): kick, light hats, slap/pop bass with dead notes, 7th/9th pad -> intensity 0
+    /// Stem 1 "drive" (4 bars): claps on 2+4, ghost snares, swung 16th hats, disco open hats,
+    ///                          wah clav/guitar stabs, optional chip arp                     -> added at intensity 1
+    /// Stem 2 "hype"  (8 bars): echoed lead (call/response), brass stabs, shaker/cowbell,
+    ///                          crash, riser + fill                                           -> added at intensity 2
     /// Each stem is soft-limited to its own ceiling and the ceilings sum to 1.0, so any layer mix peaks below 1.
     /// Every note wraps around the loop end, so decays, echoes and the pump cross the loop point seamlessly.
     /// </summary>
@@ -51,6 +53,8 @@ namespace Ronriku.Presentation.Audio
         private readonly List<Note> _arp = new List<Note>();
         private readonly List<Note> _lead = new List<Note>();
         private readonly List<Note> _perc = new List<Note>();
+        private readonly List<Note> _clav = new List<Note>();
+        private readonly List<Note> _brass = new List<Note>();
 
         public SongRenderJob(SongSpec spec)
         {
@@ -116,91 +120,87 @@ namespace Ronriku.Presentation.Audio
         {
             var rng = new Rng(Spec.Seed);
             ComposeDrums(ref rng);
-            ComposeBass();
+            ComposeBass(ref rng);
             ComposePad();
+            ComposeClav(ref rng);
             ComposeArp();
             ComposeLead(ref rng);
+            ComposeBrass();
             ComposePerc(ref rng);
         }
 
-        private static readonly float[] HatAccent = { 0.9f, 0.38f, 0.62f, 0.42f };
+        private Chord ChordAt(int bar) => Spec.Progression[((bar % Spec.Progression.Length) + Spec.Progression.Length) % Spec.Progression.Length];
+
+        /// <summary>Places pitch class <paramref name="pc"/> in the octave starting at <paramref name="low"/>.</summary>
+        private static int Place(int pc, int low) => low + ((pc - low % 12) % 12 + 24) % 12;
 
         private void ComposeDrums(ref Rng rng)
         {
-            string[] kick;
-            switch (Spec.Drums)
-            {
-                case DrumStyle.Breakbeat:
-                    kick = new[] { "x.........x.....", "x.x.......x..x..", "x.........x.....", "x.x.......x...x." };
-                    break;
-                case DrumStyle.Drive:
-                    kick = new[] { "x...x...x...x...", "x...x...x...x.x.", "x...x...x...x...", "x...x...x..xx.x." };
-                    break;
-                default:
-                    kick = new[] { "x...x...x...x...", "x...x...x...x...", "x...x...x...x...", "x...x...x...x..." };
-                    break;
-            }
-
-            bool breaks = Spec.Drums == DrumStyle.Breakbeat;
+            Groove g = Spec.Groove;
             for (int bar = 0; bar < BarsBase; bar++)
             {
                 for (int s = 0; s < 16; s++)
                 {
                     int step = bar * 16 + s;
                     int pos = StepPos(step);
-                    if (kick[bar][s] == 'x')
-                        _kicks.Add(new Note { Start = pos, Vel = s % 4 == 0 ? 1f : 0.82f, Kind = Kind.Kick });
+                    if (g.Kick[bar][s] == 'x')
+                        _kicks.Add(new Note { Start = pos, Vel = s % 4 == 0 ? 1f : 0.85f, Kind = Kind.Kick });
 
-                    // light hats in the base stem
-                    bool lightHat = breaks ? s % 2 == 0 : s % 4 == 2;
-                    if (lightHat)
-                        _lightHats.Add(new Note { Start = pos, Vel = (breaks ? (s % 4 == 0 ? 0.55f : 0.75f) : 0.8f) + rng.Bipolar() * 0.06f, Kind = Kind.Hat });
+                    // base layer: light closed hats
+                    if (g.LightHat[s] == 'x')
+                        _lightHats.Add(new Note { Start = pos, Vel = (s % 4 == 2 ? 0.8f : 0.55f) + rng.Bipolar() * 0.06f, Kind = Kind.Hat });
 
-                    // drive stem: backbeat, 16th hats, open hats
+                    // drive layer: claps on 2 and 4, ghost snares, swung 16th hats, disco open hats
                     if (s == 4 || s == 12)
-                        _driveDrums.Add(new Note { Start = pos, Vel = 1f, Kind = breaks ? Kind.Snare : Kind.Clap });
-                    if (breaks && ((s == 7 && bar % 2 == 1) || (s == 9) || (s == 15 && bar == 3)))
-                        _driveDrums.Add(new Note { Start = pos, Vel = 0.28f + rng.Value() * 0.08f, Kind = Kind.Snare });
+                    {
+                        _driveDrums.Add(new Note { Start = pos, Vel = 1f, Kind = Kind.Clap });
+                        _driveDrums.Add(new Note { Start = pos, Vel = 0.3f, Kind = Kind.Snare });
+                    }
+                    char gs = g.GhostSnare[s];
+                    if (gs == 'g' || gs == 'x')
+                        _driveDrums.Add(new Note { Start = pos, Vel = (gs == 'x' ? 0.7f : 0.2f) + rng.Value() * 0.08f, Kind = Kind.Snare });
 
-                    bool open = breaks ? (s == 14 && bar % 2 == 1) : s % 4 == 2;
-                    if (open)
-                        _driveDrums.Add(new Note { Start = pos, Vel = 0.8f, Kind = Kind.OpenHat });
+                    if (g.OpenHat[s] == 'x')
+                        _driveDrums.Add(new Note { Start = pos, Vel = 0.85f + rng.Bipolar() * 0.05f, Kind = Kind.OpenHat });
                     else
-                        _driveDrums.Add(new Note { Start = pos, Vel = HatAccent[s % 4] + rng.Bipolar() * 0.07f, Kind = Kind.Hat });
+                        _driveDrums.Add(new Note { Start = pos, Vel = g.HatAccent[s % 4] + rng.Bipolar() * 0.07f, Kind = Kind.Hat });
                 }
             }
         }
 
-        private void ComposeBass()
+        private void ComposeBass(ref Rng rng)
         {
-            string pattern;
-            switch (Spec.Bass)
-            {
-                case BassStyle.Offbeat: pattern = "..R-..O-..R-..O-"; break;
-                case BassStyle.Rolling: pattern = ".RRO.RRO.RRO.ROF"; break;
-                case BassStyle.Gallop: pattern = "R-RRO-RRR-RRO-OO"; break;
-                case BassStyle.Funk: pattern = "R..O..R.R.O..FO."; break;
-                default: pattern = "R-O-R-O-R-O-R-O-"; break;
-            }
-
+            Groove g = Spec.Groove;
             for (int bar = 0; bar < BarsBase; bar++)
             {
-                Chord chord = Spec.Progression[bar % Spec.Progression.Length];
-                int root = 40 + ((Spec.Tonic + chord.Root) % 12 + 8) % 12; // E2..D#3: audible on phone speakers
+                Chord chord = ChordAt(bar);
+                string pattern = g.Bass[bar == BarsBase - 1 ? 1 : 0];
+                int root = Place((Spec.Tonic + chord.Root) % 12, 38); // D2..C#3: audible on phone speakers
+                int next = Place((Spec.Tonic + ChordAt(bar + 1).Root) % 12, root - 6);
                 for (int s = 0; s < 16; s++)
                 {
                     char c = pattern[s];
                     if (c == '.' || c == '-') continue;
                     int len = 1;
                     while (s + len < 16 && pattern[s + len] == '-') len++;
-                    // walk up into the next chord on the last 16th of each bar
-                    if (bar == BarsBase - 1 && s == 15 && Spec.Bass != BassStyle.Rolling) c = 'F';
-                    int pitch = root + (c == 'O' ? 12 : c == 'F' ? 7 : 0);
+                    int pitch;
+                    float kind = 0f; // 0 thumb, 1 pop, 2 dead note
+                    switch (c)
+                    {
+                        case 'O': pitch = root + 12; kind = 1f; break;
+                        case 'F': pitch = root + 7; break;
+                        case '7': pitch = root + chord.Seventh; kind = 1f; break;
+                        case '3': pitch = root + chord.Third; break;
+                        case 'x': pitch = root; kind = 2f; break;
+                        case 'b': pitch = next - 1; break;
+                        default: pitch = root; break;
+                    }
                     int step = bar * 16 + s;
                     int start = StepPos(step);
                     int end = StepPos(step + len);
-                    float vel = s % 4 == 0 ? 1f : (c == 'O' ? 0.92f : 0.8f);
-                    _bass.Add(new Note { Start = start, Len = (int)((end - start) * 0.82f), Pitch = pitch, Vel = vel });
+                    float vel = kind == 2f ? 0.45f : (s % 4 == 0 ? 1f : 0.85f) + rng.Bipolar() * 0.05f;
+                    float gate = kind == 2f ? 0.35f : (len > 1 ? 0.92f : 0.7f);
+                    _bass.Add(new Note { Start = start, Len = Math.Max(40, (int)((end - start) * gate)), Pitch = pitch, Vel = vel, Aux = kind });
                 }
             }
         }
@@ -209,49 +209,103 @@ namespace Ronriku.Presentation.Audio
         {
             for (int bar = 0; bar < BarsBase; bar++)
             {
-                Chord chord = Spec.Progression[bar % Spec.Progression.Length];
+                Chord chord = ChordAt(bar);
+                bool rootless = chord.Tones.Length >= 4; // the bass has the root: voice 3rd/7th/9th like keys would
                 foreach (int iv in chord.Tones)
                 {
-                    int pc = (Spec.Tonic + chord.Root + iv) % 12;
-                    int note = 57 + ((pc - 57 % 12) + 24) % 12; // close voicing in [57, 69)
+                    if (rootless && iv == 0) continue;
+                    if (iv == 7 && chord.Tones.Length >= 5) continue; // drop the 5th from 9th chords
+                    int note = Place((Spec.Tonic + chord.Root + iv) % 12, 55);
                     _pad.Add(new Note { Start = bar * BarLen, Len = BarLen - StepLen, Pitch = note, Vel = iv == 0 ? 1f : 0.85f });
+                }
+            }
+        }
+
+        /// <summary>Upper-structure chord tones (3rd, 7th, 9th/5th) for stabs, in [low, low+12).</summary>
+        private int[] StabVoicing(Chord chord, int low)
+        {
+            var list = new List<int>();
+            foreach (int iv in chord.Tones)
+            {
+                if (iv == 0) continue;
+                if (iv == 7 && chord.Tones.Length >= 5) continue;
+                list.Add(Place((Spec.Tonic + chord.Root + iv) % 12, low));
+                if (list.Count == 3) break;
+            }
+            if (list.Count < 3) list.Add(Place((Spec.Tonic + chord.Root) % 12, low) + 12);
+            list.Sort();
+            return list.ToArray();
+        }
+
+        private void ComposeClav(ref Rng rng)
+        {
+            string pattern = Spec.Groove.Clav;
+            for (int bar = 0; bar < BarsBase; bar++)
+            {
+                Chord chord = ChordAt(bar);
+                int[] voicing = StabVoicing(chord, 60);
+                for (int s = 0; s < 16; s++)
+                {
+                    char c = pattern[s];
+                    if (c != 'x' && c != 'g') continue;
+                    int step = bar * 16 + s;
+                    bool ghost = c == 'g';
+                    float vel = (ghost ? 0.4f : (s % 4 == 0 ? 1f : 0.85f)) + rng.Bipolar() * 0.05f;
+                    foreach (int v in voicing)
+                        _clav.Add(new Note
+                        {
+                            Start = StepPos(step), Len = ghost ? StepLen / 3 : (int)(StepLen * 0.8f), Pitch = v,
+                            Vel = vel, Aux = ghost ? 1f : 0f,
+                        });
                 }
             }
         }
 
         private void ComposeArp()
         {
+            if (Spec.Groove.ArpLevel <= 0f) return;
             for (int bar = 0; bar < BarsBase; bar++)
             {
-                Chord chord = Spec.Progression[bar % Spec.Progression.Length];
-                int basePc = (Spec.Tonic + chord.Root) % 12;
-                int baseNote = 64 + ((basePc - 64 % 12) + 24) % 12;
+                Chord chord = ChordAt(bar);
+                int baseNote = Place((Spec.Tonic + chord.Root) % 12, 67);
                 var tones = new List<int>();
                 for (int oct = 0; oct < 2; oct++)
-                    foreach (int iv in chord.Tones) tones.Add(baseNote + iv + 12 * oct);
-                int n = chord.Tones.Length, n2 = tones.Count;
+                    foreach (int iv in chord.Tones)
+                        if (iv < 12) tones.Add(baseNote + iv + 12 * oct);
+                int n2 = tones.Count;
                 float duty = bar % 2 == 0 ? 0.125f : 0.25f;
-
                 for (int s = 0; s < 16; s++)
                 {
-                    int idx;
-                    switch (Spec.Arp)
-                    {
-                        case ArpStyle.UpDown:
-                            int period = 2 * n2 - 2, k = s % period;
-                            idx = k < n2 ? k : period - k;
-                            break;
-                        case ArpStyle.Broken: idx = ((s >> 1) + (s & 1) * 2) % n2; break;
-                        case ArpStyle.PingPong: idx = (s >> 1) % n + ((s & 1) == 1 ? n : 0); break;
-                        default: idx = s % n2; break;
-                    }
+                    if (s % 4 == 3) continue; // a gap in every beat keeps the arp from smearing the groove
+                    int period = 2 * n2 - 2, k = s % period;
+                    int idx = k < n2 ? k : period - k;
                     int step = bar * 16 + s;
-                    int start = StepPos(step);
                     _arp.Add(new Note
                     {
-                        Start = start, Len = (int)(StepLen * 0.75f), Pitch = tones[idx],
-                        Vel = s % 4 == 0 ? 1f : (s % 2 == 0 ? 0.72f : 0.55f), Aux = duty,
+                        Start = StepPos(step), Len = (int)(StepLen * 0.7f), Pitch = tones[idx],
+                        Vel = Spec.Groove.ArpLevel * (s % 4 == 0 ? 1f : 0.65f), Aux = duty,
                     });
+                }
+            }
+        }
+
+        private void ComposeBrass()
+        {
+            string pattern = Spec.Groove.Brass;
+            for (int bar = 0; bar < BarsHype; bar++)
+            {
+                Chord chord = ChordAt(bar);
+                int[] voicing = StabVoicing(chord, 62);
+                for (int s = 0; s < 16; s++)
+                {
+                    int ps = (bar % 2) * 16 + s;
+                    if (pattern[ps] != 'x') continue;
+                    int len = 1;
+                    while (ps + len < 32 && pattern[ps + len] == '-') len++;
+                    int step = bar * 16 + s;
+                    int start = StepPos(step), end = StepPos(step + len);
+                    foreach (int v in voicing)
+                        _brass.Add(new Note { Start = start, Len = (int)((end - start) * 0.85f), Pitch = v, Vel = s % 4 == 0 ? 1f : 0.85f });
                 }
             }
         }
@@ -262,10 +316,10 @@ namespace Ronriku.Presentation.Audio
 
         private static readonly string[] Cells =
         {
-            "x---", "x-x-", "x.x.", "x-.x", ".x-x", "xxx-", "x..x", "x-xx", "..x-", "x.xx",
+            "x---", "x-x-", "x.x.", "x-.x", ".x-x", "xxx-", "x..x", "x-xx", "..x-", "x.xx", ".x.x", ".xx.", "..xx",
         };
 
-        private static readonly int[] CellWeight = { 3, 4, 3, 3, 2, 2, 2, 2, 1, 2 };
+        private static readonly int[] CellWeight = { 2, 2, 3, 3, 3, 1, 3, 2, 1, 2, 3, 2, 2 };
 
         private List<(int step, int len)> MakeRhythm(ref Rng rng, bool response)
         {
@@ -406,7 +460,7 @@ namespace Ronriku.Presentation.Audio
 
         private void ComposePerc(ref Rng rng)
         {
-            bool breaks = Spec.Drums == DrumStyle.Breakbeat;
+            bool breaks = Spec.Style == GrooveStyle.ElectroFunk || Spec.Style == GrooveStyle.JazzFunk || Spec.Style == GrooveStyle.GFunk;
             for (int bar = 0; bar < BarsHype; bar++)
             {
                 for (int s = 0; s < 16; s++)
@@ -430,7 +484,7 @@ namespace Ronriku.Presentation.Audio
                     else
                     {
                         _perc.Add(new Note { Start = pos, Vel = (s % 4 == 2 ? 0.85f : s % 2 == 1 ? 0.55f : 0.3f) + rng.Bipolar() * 0.08f, Kind = Kind.Shaker });
-                        if (Spec.Drums == DrumStyle.Drive && (s == 3 || s == 10))
+                        if (Spec.Style == GrooveStyle.BossFunk && (s == 3 || s == 10))
                             _perc.Add(new Note { Start = pos, Vel = 0.55f, Kind = Kind.Tom, Pitch = s == 3 ? 160f : 120f });
                     }
                 }
@@ -454,6 +508,7 @@ namespace Ronriku.Presentation.Audio
             AddChunks(lenA, chunk, (a, b) => ApplyDuck(Stems[0], a, b, 1f));
             AddNotes(_kicks, 8, n => Kick(Stems[0], n));
             AddNotes(_lightHats, 16, n => Drum(Stems[0], n));
+            AddHighPass(0, lenA, chunk);
             AddChunks(lenA, chunk, (a, b) => Limit(0, a, b));
             _work.Add(() => _ready[0] = true);
 
@@ -461,8 +516,10 @@ namespace Ronriku.Presentation.Audio
             _work.Add(() => { Stems[1] = new float[lenA]; _scratch = new float[lenC]; });
             AddNotes(_arp, 16, n => Arp(_scratch, lenA, n));
             AddChunks(lenA, chunk, (a, b) => EchoInto(Stems[1], _scratch, lenA, a, b, 3 * StepLen, 0.32f, 3, 0.1f));
-            AddChunks(lenA, chunk, (a, b) => ApplyDuck(Stems[1], a, b, 0.8f));
+            AddNotes(_clav, 12, n => Clav(Stems[1], n));
+            AddChunks(lenA, chunk, (a, b) => ApplyDuck(Stems[1], a, b, 0.6f));
             AddNotes(_driveDrums, 16, n => Drum(Stems[1], n));
+            AddHighPass(1, lenA, chunk);
             AddChunks(lenA, chunk, (a, b) => Limit(1, a, b));
             _work.Add(() => _ready[1] = true);
 
@@ -470,10 +527,39 @@ namespace Ronriku.Presentation.Audio
             _work.Add(() => { Stems[2] = new float[lenC]; Array.Clear(_scratch, 0, _scratch.Length); });
             AddNotes(_lead, 6, n => Lead(_scratch, n));
             AddChunks(lenC, chunk, (a, b) => EchoInto(Stems[2], _scratch, lenC, a, b, 3 * StepLen, 0.36f, 4, 0.35f));
+            AddNotes(_brass, 6, n => Brass(Stems[2], n));
             AddChunks(lenC, chunk, (a, b) => ApplyDuck(Stems[2], a, b, 0.45f));
             AddNotes(_perc, 16, n => Drum(Stems[2], n));
+            AddHighPass(2, lenC, chunk);
             AddChunks(lenC, chunk, (a, b) => Limit(2, a, b));
             _work.Add(() => { _ready[2] = true; _scratch = null; _duck = null; });
+        }
+
+        public const float MasterHighPassHz = 38f;
+        private readonly Biquad[] _hp = new Biquad[StemCount];
+
+        /// <summary>
+        /// 2nd-order Butterworth high-pass over a loop. The filter is warmed up on the loop's tail first, so its
+        /// state at sample 0 is what it would be after the loop's end: the loop point stays seamless.
+        /// Filtering in place is safe because the warm-up only reads samples that are rewritten last.
+        /// </summary>
+        private void AddHighPass(int stem, int length, int chunk)
+        {
+            _work.Add(() =>
+            {
+                var bq = Biquad.HighPass(MasterHighPassHz, 0.7071f);
+                float[] buf = Stems[stem];
+                int warm = Math.Min(length, Rate / 2);
+                for (int i = length - warm; i < length; i++) bq.Process(buf[i]);
+                _hp[stem] = bq;
+            });
+            AddChunks(length, chunk, (a, b) =>
+            {
+                float[] buf = Stems[stem];
+                Biquad bq = _hp[stem];
+                for (int i = a; i < b; i++) buf[i] = bq.Process(buf[i]);
+                _hp[stem] = bq;
+            });
         }
 
         private void AddNotes(List<Note> notes, int perStep, Action<Note> render)
@@ -568,24 +654,44 @@ namespace Ronriku.Presentation.Audio
 
         private uint NoteSeed(Note n) => Rng.Hash(Spec.Seed, (uint)n.Start * 31u + (uint)n.Kind);
 
+        /// <summary>
+        /// Kick built to survive phone speakers: a short sub (fast decay), an overdriven pitch-swept body whose
+        /// harmonics land at 150-600 Hz, a 180 Hz "thump" and a 1.6 kHz knock + band-passed click on the attack.
+        /// </summary>
         private void Kick(float[] buf, Note n)
         {
             int len = buf.Length;
-            int count = (int)(0.34f * Rate);
+            int count = (int)(Math.Max(0.3f, Spec.Groove.KickDecay * 3f) * Rate);
             int w = Wrap(n.Start, len);
-            float phase = 0f, amp = 1f, ampDecay = Dsp.Decay(0.115f), sweep = 1f, sweepDecay = Dsp.Decay(0.03f);
+            float phase = 0f, amp = 1f, ampDecay = Dsp.Decay(Spec.Groove.KickDecay), sweep = 1f, sweepDecay = Dsp.Decay(0.03f);
+            float sub = 1f, subDecay = Dsp.Decay(Spec.Groove.KickDecay * 0.55f);
+            float thump = 0f, thumpEnv = 1f, thumpDecay = Dsp.Decay(0.05f);
+            float knock = 0f, knockEnv = 1f, knockDecay = Dsp.Decay(0.01f);
+            float clickEnv = 1f, clickDecay = Dsp.Decay(0.004f), hpLp = 0f, bpLp = 0f;
+            float hpA = Dsp.OnePole(1000f), lpA = Dsp.OnePole(4000f), bodyLp = 0f, bodyA = Dsp.OnePole(110f);
             var rng = new Rng(NoteSeed(n));
-            float gain = 0.56f * n.Vel;
+            float gain = 0.5f * n.Vel;
             for (int j = 0; j < count; j++)
             {
-                float f = 50f + 160f * sweep;
+                float f = Spec.Groove.KickPitch + 8f + 170f * sweep;
                 phase += f / Rate; if (phase >= 1f) phase -= 1f;
-                float body = Dsp.Sat(MathF.Sin(Dsp.TwoPi * phase) * 1.6f);
-                float att = j < 22 ? j / 22f : 1f;
-                float click = j < 110 ? (rng.Bipolar() * 0.18f + (j < 40 ? 0.25f : 0f) * MathF.Sin(j * 0.55f)) * (1f - j / 110f) : 0f;
+                float sine = MathF.Sin(Dsp.TwoPi * phase);
+                float drive = Dsp.Sat(sine * 3.2f) * amp;
+                bodyLp += bodyA * (drive - bodyLp);
+                float body = (drive - 0.8f * bodyLp) * 0.8f + sine * 0.2f * sub;
+                thump += 200f / Rate; if (thump >= 1f) thump -= 1f;
+                knock += 1650f / Rate; if (knock >= 1f) knock -= 1f;
+                float x = rng.Bipolar();
+                hpLp += hpA * (x - hpLp);
+                bpLp += lpA * ((x - hpLp) - bpLp);
+                float transient = Dsp.Triangle(thump) * 0.55f * thumpEnv
+                                + MathF.Sin(Dsp.TwoPi * knock) * 0.6f * knockEnv
+                                + bpLp * 0.9f * clickEnv;
+                float att = j < 24 ? j / 24f : 1f; // ~1 ms: a crisp knock without a digital click
                 float tail = j > count - 200 ? (count - j) / 200f : 1f;
-                buf[w] += gain * (body * amp * att * tail + click);
-                amp *= ampDecay; sweep *= sweepDecay;
+                buf[w] += gain * (body + transient) * att * tail;
+                amp *= ampDecay; sub *= subDecay; sweep *= sweepDecay;
+                thumpEnv *= thumpDecay; knockEnv *= knockDecay; clickEnv *= clickDecay;
                 if (++w >= len) w = 0;
             }
         }
@@ -604,7 +710,7 @@ namespace Ronriku.Presentation.Audio
                     bool open = n.Kind == Kind.OpenHat, shaker = n.Kind == Kind.Shaker;
                     float tau = open ? 0.11f : shaker ? 0.028f : 0.022f;
                     int count = (int)(tau * 6f * Rate);
-                    float gain = n.Vel * (open ? 0.15f : shaker ? 0.12f : 0.17f);
+                    float gain = n.Vel * (open ? 0.21f : shaker ? 0.12f : 0.17f);
                     float lpA = Dsp.OnePole(shaker ? 3800f : 5200f), lp = 0f, dec = Dsp.Decay(tau), env = 1f;
                     float lp2A = Dsp.OnePole(9500f), lp2 = 0f;
                     int attack = shaker ? (int)(0.006f * Rate) : 4;
@@ -628,7 +734,7 @@ namespace Ronriku.Presentation.Audio
                     bool clap = n.Kind == Kind.Clap;
                     int count = (int)(0.3f * Rate);
                     float gain = n.Vel * 0.2f;
-                    float hpA = Dsp.OnePole(clap ? 900f : 700f), hpLp = 0f, lpA = Dsp.OnePole(clap ? 3400f : 5200f), lp = 0f;
+                    float hpA = Dsp.OnePole(clap ? 900f : 700f), hpLp = 0f, lpA = Dsp.OnePole(clap ? 3000f : 4200f), lp = 0f, lp2 = 0f;
                     float tone = 0f, toneEnv = 1f, toneDec = Dsp.Decay(0.045f);
                     float tail = 1f, tailDec = Dsp.Decay(clap ? 0.075f : 0.06f);
                     float burstDec = Dsp.Decay(0.004f);
@@ -640,6 +746,7 @@ namespace Ronriku.Presentation.Audio
                         hpLp += hpA * (x - hpLp);
                         float band = x - hpLp;
                         lp += lpA * (band - lp);
+                        lp2 += lpA * (lp - lp2); // 12 dB/oct: keeps the clap from fighting the hats up top
                         float env;
                         if (clap)
                         {
@@ -657,7 +764,7 @@ namespace Ronriku.Presentation.Audio
                         float body = MathF.Sin(Dsp.TwoPi * tone) * toneEnv * (clap ? 0.35f : 0.6f);
                         toneEnv *= toneDec;
                         float end = j > count - 100 ? (count - j) / 100f : 1f;
-                        buf[w] += gain * (lp * 1.6f * env + body) * end;
+                        buf[w] += gain * (lp2 * 2.1f * env + body) * end;
                         if (++w >= len) w = 0;
                     }
                     break;
@@ -738,28 +845,42 @@ namespace Ronriku.Presentation.Audio
         private void Bass(float[] buf, Note n)
         {
             int len = buf.Length;
+            bool pop = n.Aux == 1f, dead = n.Aux == 2f;
             int release = (int)(0.012f * Rate);
             int count = n.Len + release;
             int w = Wrap(n.Start, len);
             float f = Dsp.Mtof(n.Pitch), dt = f / Rate;
-            // pulse width drifts over the bar: a slow PWM feel across notes
+            // pulse width drifts over two bars: a slow PWM feel across notes
             float barPhase = (n.Start % (BarLen * 2)) / (float)(BarLen * 2);
             float duty = 0.3f + 0.16f * MathF.Sin(Dsp.TwoPi * barPhase);
             float phase = 0f, lp1 = 0f, lp2 = 0f, a = 0f;
-            float filt = 1f, filtDec = Dsp.Decay(0.07f);
-            float gain = 0.17f * n.Vel;
-            float cutBase = 380f, cutEnv = 2200f + 1200f * n.Vel, held = 0f;
+            float filt = 1f, filtDec = Dsp.Decay(dead ? 0.015f : pop ? 0.05f : 0.07f);
+            float gain = (pop ? 0.17f : dead ? 0.12f : 0.15f) * n.Vel;
+            float cutBase = dead ? 220f : 380f;
+            float cutEnv = dead ? 700f : pop ? 3600f + 800f * n.Vel : 2200f + 1200f * n.Vel;
+            float held = 0f, hpLp = 0f, hpLp2 = 0f, hpA = Dsp.OnePole(120f);
+            var rng = new Rng(NoteSeed(n));
+            int click = pop ? (int)(0.004f * Rate) : dead ? (int)(0.012f * Rate) : 0;
             for (int j = 0; j < count; j++)
             {
                 if ((j & 7) == 0) a = Dsp.OnePole(cutBase + cutEnv * filt);
                 phase += dt; if (phase >= 1f) phase -= 1f;
-                float x = Dsp.Pulse(phase, dt, duty) * 0.9f + Dsp.Triangle(phase) * 0.2f;
+                float x = Dsp.Pulse(phase, dt, duty);
                 lp1 += a * (x - lp1);
                 lp2 += a * (lp1 - lp2);
                 float env;
                 if (j < n.Len) { env = (j < 30 ? j / 30f : 1f) * (1f - 0.2f * Math.Min(1f, j / (0.12f * Rate))); held = env; }
                 else env = held * (1f - (j - n.Len) / (float)release);
-                buf[w] += gain * Dsp.Sat(lp2 * 1.3f) * env;
+                // overdrive: pushes energy into 2nd-6th harmonics (150-800 Hz), then a gentle high-pass
+                // trims the fundamental so the note reads through small speakers without eating headroom
+                float driven = Dsp.Sat(lp2 * 3.2f);
+                hpLp += hpA * (driven - hpLp);
+                float hp1 = driven - hpLp;
+                hpLp2 += hpA * (hp1 - hpLp2);
+                float v = (hp1 - 0.8f * hpLp2) * 1.2f * env;
+                // slap transient: a string-snap click on pops, a muted thud on dead notes
+                if (j < click) v += rng.Bipolar() * (pop ? 0.5f : 0.35f) * (1f - j / (float)click);
+                buf[w] += gain * v;
                 filt *= filtDec;
                 if (++w >= len) w = 0;
             }
@@ -815,6 +936,80 @@ namespace Ronriku.Presentation.Audio
             }
         }
 
+        /// <summary>Clav/guitar stab through an envelope-swept resonant band-pass (auto-wah).</summary>
+        private void Clav(float[] buf, Note n)
+        {
+            int len = buf.Length;
+            bool scratch = n.Aux == 1f;
+            int release = (int)(0.02f * Rate);
+            int count = n.Len + release;
+            int w = Wrap(n.Start, len);
+            float f = Dsp.Mtof(n.Pitch), dt = f / Rate;
+            var rng = new Rng(NoteSeed(n) ^ (uint)n.Pitch);
+            float phase = 0f, low = 0f, band = 0f, fc = 0f;
+            float q = 1f / Spec.WahQ;
+            float rise = 1f, riseMul = Dsp.Decay(0.007f), fall = 1f, fallMul = Dsp.Decay(scratch ? 0.03f : 0.09f);
+            float gain = 0.085f * n.Vel;
+            float held = 0f;
+            for (int j = 0; j < count; j++)
+            {
+                if ((j & 7) == 0)
+                {
+                    float e = (1f - rise) * fall;
+                    float hz = Math.Min(3200f, 380f + 2500f * e * (0.6f + 0.4f * n.Vel));
+                    fc = 2f * MathF.Sin(MathF.PI * hz / Rate);
+                }
+                phase += dt; if (phase >= 1f) phase -= 1f;
+                float x = scratch ? rng.Bipolar() * 0.7f + Dsp.Pulse(phase, dt, 0.25f) * 0.3f : Dsp.Pulse(phase, dt, 0.25f);
+                low += fc * band;
+                float high = x - low - q * band;
+                band += fc * high;
+                float env;
+                if (j < n.Len) { env = j < 16 ? j / 16f : 1f; held = env; }
+                else env = held * (1f - (j - n.Len) / (float)release);
+                buf[w] += gain * (band * 0.9f + low * 0.3f) * env;
+                rise *= riseMul; fall *= fallMul;
+                if (++w >= len) w = 0;
+            }
+        }
+
+        /// <summary>Brass-style stab: a detuned saw pair with a pitch scoop and a filter swell.</summary>
+        private void Brass(float[] buf, Note n)
+        {
+            int len = buf.Length;
+            int release = (int)(0.07f * Rate);
+            int count = n.Len + release;
+            int w = Wrap(n.Start, len);
+            float p1 = 0f, p2 = 0.3f, lp1 = 0f, lp2 = 0f, a = 0f, d1 = 0f, d2 = 0f;
+            float filt = 1f, filtDec = Dsp.Decay(0.16f);
+            float gain = 0.055f * n.Vel;
+            float held = 0f;
+            int attack = (int)(0.012f * Rate);
+            int scoop = (int)(0.035f * Rate);
+            for (int j = 0; j < count; j++)
+            {
+                if ((j & 7) == 0)
+                {
+                    float pitch = n.Pitch - (j < scoop ? 0.7f * (1f - j / (float)scoop) : 0f);
+                    float hz = Dsp.Mtof(pitch);
+                    d1 = hz * 1.005f / Rate; d2 = hz * 0.995f / Rate;
+                    float swell = Math.Min(1f, j / (0.02f * Rate));
+                    a = Dsp.OnePole(700f + 2600f * swell * filt);
+                }
+                p1 += d1; if (p1 >= 1f) p1 -= 1f;
+                p2 += d2; if (p2 >= 1f) p2 -= 1f;
+                float x = Dsp.Saw(p1, d1) + Dsp.Saw(p2, d2);
+                lp1 += a * (x - lp1);
+                lp2 += a * (lp1 - lp2);
+                float env;
+                if (j < n.Len) { env = (j < attack ? j / (float)attack : 1f) * (0.8f + 0.2f * filt); held = env; }
+                else env = held * (1f - (j - n.Len) / (float)release);
+                buf[w] += gain * lp2 * env;
+                filt *= filtDec;
+                if (++w >= len) w = 0;
+            }
+        }
+
         private float _lastLeadPitch = -1f;
         private int _lastLeadEnd = int.MinValue;
 
@@ -825,9 +1020,10 @@ namespace Ronriku.Presentation.Audio
             int count = n.Len + release;
             int w = Wrap(n.Start, len);
             // glide in from the previous note when it was (nearly) legato
-            float from = (_lastLeadPitch > 0f && n.Start - _lastLeadEnd < StepLen) ? _lastLeadPitch : n.Pitch;
+            bool whine = Spec.Lead == LeadVoice.Whine;
+            float from = (_lastLeadPitch > 0f && (whine || n.Start - _lastLeadEnd < StepLen)) ? _lastLeadPitch : n.Pitch;
             _lastLeadPitch = n.Pitch; _lastLeadEnd = n.Start + n.Len;
-            int glide = (int)(0.035f * Rate);
+            int glide = (int)((whine ? 0.09f : 0.035f) * Rate);
             int vibDelay = (int)(0.16f * Rate);
             float p1 = 0f, p2 = 0.5f, lp = 0f, lp2 = 0f;
             float lpA = Dsp.OnePole(4300f * Spec.LeadBright), lp2A = Dsp.OnePole(7000f);
@@ -839,7 +1035,7 @@ namespace Ronriku.Presentation.Audio
                 {
                     float pitch = j < glide ? from + (n.Pitch - from) * (j / (float)glide) : n.Pitch;
                     float t = j / (float)Rate;
-                    if (j > vibDelay) pitch += 0.22f * Math.Min(1f, (j - vibDelay) / (0.15f * Rate)) * MathF.Sin(Dsp.TwoPi * 5.6f * t);
+                    if (j > vibDelay) pitch += (whine ? 0.35f : 0.22f) * Math.Min(1f, (j - vibDelay) / (0.15f * Rate)) * MathF.Sin(Dsp.TwoPi * (whine ? 6.2f : 5.6f) * t);
                     float hz = Dsp.Mtof(pitch);
                     f1 = hz / Rate; f2 = hz * 1.0058f / Rate;
                 }
@@ -847,7 +1043,9 @@ namespace Ronriku.Presentation.Audio
                 float duty = 0.3f + 0.17f * MathF.Sin(Dsp.TwoPi * 0.45f * global + j * 0.00012f);
                 p1 += f1; if (p1 >= 1f) p1 -= 1f;
                 p2 += f2; if (p2 >= 1f) p2 -= 1f;
-                float x = Dsp.Pulse(p1, f1, duty) + 0.6f * Dsp.Pulse(p2, f2, 0.5f);
+                float x = whine
+                    ? 1.5f * Dsp.Triangle(p1) + 0.35f * Dsp.Pulse(p2, f2, 0.125f)
+                    : Dsp.Pulse(p1, f1, duty) + 0.6f * Dsp.Pulse(p2, f2, 0.5f);
                 lp += lpA * (x - lp);
                 lp2 += lp2A * (lp - lp2);
                 float env;

@@ -15,6 +15,7 @@ services:
         NEXT_PUBLIC_SOLANA_RPC_URL: ${SOLANA_RPC_URL:-https://api.devnet.solana.com}
         NEXT_PUBLIC_PAYMENT_RECIPIENT: ${PAYMENT_RECIPIENT:-}
         NEXT_PUBLIC_SITE_URL: ${SITE_URL:?set SITE_URL in deploy/.env}
+        NEXT_PUBLIC_CONTACT_EMAIL: ${CONTACT_EMAIL:-}
     image: ronriku-web:latest
     restart: unless-stopped
     environment:

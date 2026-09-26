@@ -18,6 +18,8 @@ export const publicEnv = {
   /** Wallet that receives SOL payments (public address; its secret key never touches this server). */
   paymentRecipient: process.env.NEXT_PUBLIC_PAYMENT_RECIPIENT ?? "",
   siteUrl: (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/$/, ""),
+  /** Public support / privacy contact shown on /privacy and /terms (store listings require one). */
+  contactEmail: process.env.NEXT_PUBLIC_CONTACT_EMAIL ?? "",
 } as const;
 
 export const SOLANA_CLUSTER = "devnet" as const;

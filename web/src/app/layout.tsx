@@ -12,10 +12,11 @@ const pixelify = Pixelify_Sans({ subsets: ["latin"], weight: ["400", "500", "600
 
 export const metadata: Metadata = {
   metadataBase: new URL(publicEnv.siteUrl),
-  title: { default: "RONRIKU — daily pixel reasoning", template: "%s · RONRIKU" },
+  title: { default: "Odlet — daily pixel reasoning", template: "%s · Odlet" },
   description: "Three reasoning trials a day, an adventure of voxel monsters and bosses, and collectible voxel figures on Solana devnet.",
-  applicationName: "RONRIKU",
-  openGraph: { title: "RONRIKU", description: "Pixel reasoning game for Solana Seeker and the web.", type: "website" },
+  applicationName: "Odlet",
+  openGraph: { title: "Odlet", siteName: "Odlet", description: "Pixel reasoning game for Solana Seeker and the web.", type: "website", url: "/" },
+  twitter: { card: "summary", title: "Odlet", description: "Pixel reasoning game for Solana Seeker and the web." },
 };
 
 export const viewport: Viewport = {

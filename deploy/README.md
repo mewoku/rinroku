@@ -1,4 +1,4 @@
-# Self-hosting RONRIKU (Docker)
+# Self-hosting Odlet (Docker)
 
 One origin, three pieces:
 
@@ -19,11 +19,11 @@ browser ──► Caddy (:80/:443, or 127.0.0.1:8080 locally)
 
 ## VPS (Ubuntu 22.04/24.04, ≥ 4 GB RAM recommended; 2 GB + swap works without Studio)
 
-1. Point a DNS A (and AAAA) record for your domain at the server.
+1. Point DNS A (and AAAA) records for `odlet.xyz` (the default `DOMAIN`) at the server.
 2. Run:
 
    ```bash
-   DOMAIN=play.example.com REPO_URL=https://github.com/<you>/RONRIKU.git bash up.sh
+   DOMAIN=odlet.xyz REPO_URL=https://github.com/<you>/RONRIKU.git bash up.sh
    # low RAM: add SUPABASE_EXCLUDE=studio,imgproxy,inbucket (keep edge-runtime: it serves wallet-link)
    ```
 
@@ -60,5 +60,6 @@ After a host reboot the Supabase containers restart on their own (`unless-stoppe
 
 - `NEXT_PUBLIC_SUPABASE_URL=same-origin` is baked into the image: the browser uses `window.location.origin`, so the same image works on any domain; the server uses `SUPABASE_INTERNAL_URL` (Kong on the Docker network). The page CSP then allows Supabase via `'self'`. `SITE_URL` and the anon key are also build-time values; change them → rebuild (`up.sh` does it).
 - Unity files: Caddy serves `/unity/*` with the right `Content-Encoding`/`Content-Type` for `.br`/`.gz` builds, `application/wasm` for `.wasm`, and no encoding for `.unityweb` (decompression-fallback builds, the current one). `Cache-Control: no-cache` because Unity file names carry no hash.
-- Wallet link: give the edge function `WALLET_LINK_DOMAIN=<your domain>` (`[edge_runtime.secrets]` in `backend/supabase/config.toml`, then `supabase stop && supabase start`) so wallets show the real site in the link message. Default: `ronriku.local`.
-- Unity client behind Caddy: backend URL = `SITE_URL` (e.g. `http://localhost:8080` / `https://play.example.com`), anon key = `SUPABASE_ANON_KEY` in `deploy/.env`. On Android use HTTPS in production (disable `insecureHttpOption`).
+- Wallet link: give the edge function `WALLET_LINK_DOMAIN=<your domain>` (`[edge_runtime.secrets]` in `backend/supabase/config.toml`, then `supabase stop && supabase start`) so wallets show the real site in the link message. Default: `odlet.xyz` (also listed in `.env.example` as `WALLET_LINK_DOMAIN`).
+- Other domains (`www.odlet.xyz`, `odlet.fun`): point their DNS at the same server and add a redirect block to the `Caddyfile`, e.g. `www.odlet.xyz, odlet.fun, www.odlet.fun { redir https://odlet.xyz{uri} permanent }`. One canonical origin keeps NFT metadata URIs and the wallet-link domain stable.
+- Unity client behind Caddy: backend URL = `SITE_URL` (e.g. `http://localhost:8080` / `https://odlet.xyz`), anon key = `SUPABASE_ANON_KEY` in `deploy/.env`. On Android use HTTPS in production (disable `insecureHttpOption`).

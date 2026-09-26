@@ -5,7 +5,7 @@ import { Contact, LEGAL_UPDATED, LegalList, LegalSection, Strong } from "@/compo
 
 export const metadata: Metadata = {
   title: "Terms",
-  description: "Terms of use for the RONRIKU app and website.",
+  description: "Terms of use for the Odlet app and website.",
 };
 
 export default function TermsPage() {
@@ -14,12 +14,12 @@ export default function TermsPage() {
       <PageHeader kicker={`Updated ${LEGAL_UPDATED}`} title="Terms" />
       <div className="mx-auto max-w-[720px] space-y-6">
         <p className="text-[17px] leading-7 text-text">
-          By playing RONRIKU (the Android app or this website) you agree to these terms. If you do not agree, please do not use the game.
+          By playing Odlet (the Android app or this website) you agree to these terms. If you do not agree, please do not use the game.
         </p>
 
         <LegalSection id="game" title="The game">
           <p>
-            RONRIKU is provided free of charge, as is, and may change, pause or reset at any time, including seasons, ratings, shop items and balances.
+            Odlet is provided free of charge, as is, and may change, pause or reset at any time, including seasons, ratings, shop items and balances.
             We try hard to keep it running but do not guarantee it will always be available or error-free.
           </p>
         </LegalSection>
@@ -32,7 +32,7 @@ export default function TermsPage() {
               </>,
               <>
                 Figures bought with SOL on the website are minted as NFTs on Solana <Strong>devnet</Strong>, a public test network. Devnet SOL and devnet
-                NFTs have no monetary value. Nothing in RONRIKU is an investment or a promise of future value.
+                NFTs have no monetary value. Nothing in Odlet is an investment or a promise of future value.
               </>,
               <>
                 Blockchain transactions are final. You are responsible for your wallet, its keys and the transactions you sign. We never ask for your seed
@@ -54,14 +54,14 @@ export default function TermsPage() {
 
         <LegalSection id="ip" title="Content and licences">
           <p>
-            The game, its art and music belong to RONRIKU. The source code is MIT-licensed and the fonts are licensed under the SIL Open Font License;
+            The game, its art and music belong to Odlet. The source code is MIT-licensed and the fonts are licensed under the SIL Open Font License;
             see the third-party notices in the project. You may share screenshots and videos of your play.
           </p>
         </LegalSection>
 
         <LegalSection id="liability" title="Liability">
           <p>
-            To the extent the law allows, RONRIKU is provided without warranties, and we are not liable for indirect or consequential losses, lost
+            To the extent the law allows, Odlet is provided without warranties, and we are not liable for indirect or consequential losses, lost
             progress, or losses from blockchain transactions, wallets or third-party services. Nothing here limits rights you have under consumer law
             that cannot be waived.
           </p>

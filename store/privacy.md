@@ -1,10 +1,10 @@
-# RONRIKU privacy policy
+# Odlet privacy policy
 
-Updated: 26 September 2026. Web version: `/privacy` on the RONRIKU site (source
+Updated: 26 September 2026. Web version: `/privacy` on the Odlet site (source
 `web/src/app/privacy/page.tsx`); keep both in sync. Store listings need the **public HTTPS URL** of the web
-page, e.g. `https://<your-domain>/privacy`.
+page: `https://odlet.xyz/privacy`.
 
-RONRIKU is a puzzle game. It needs very little about you: no email, no real name, no phone number, no
+Odlet is a puzzle game. It needs very little about you: no email, no real name, no phone number, no
 location. There are no ads and no analytics or tracking SDKs in the app or on the website.
 
 ## In short
@@ -57,7 +57,7 @@ be deleted by us.
 ## Retention and deletion
 
 Account data is kept while the account exists. To delete the online account and everything linked to
-it, email **{{CONTACT_EMAIL}}** with your player handle (ME tab); deletion within 30 days. Uninstall to
+it, email **hello@odlet.xyz** with your player handle (ME tab); deletion within 30 days. Uninstall to
 remove local data. On-chain data cannot be removed. You may also request a copy or correction of your
 data and complain to your data protection authority.
 
@@ -67,13 +67,14 @@ Not directed at children under 13; we do not knowingly collect their data and de
 
 ## Changes and contact
 
-Changes are posted on this page with a new date. Contact: **{{CONTACT_EMAIL}}**.
+Changes are posted on this page with a new date. Contact: **hello@odlet.xyz**.
 
 ---
 
 ### Owner notes (not part of the policy)
 
-- Replace `{{CONTACT_EMAIL}}` and set `NEXT_PUBLIC_CONTACT_EMAIL` (web) / `CONTACT_EMAIL` (deploy/.env)
+- `hello@odlet.xyz` is a **placeholder**: create that mailbox (or change it here) before launch, and set
+  `NEXT_PUBLIC_CONTACT_EMAIL` (web) / `CONTACT_EMAIL` (deploy/.env; `.env.example` already has it)
   so the web page shows it. Without it the page says "the support contact listed on our app store page".
 - Account deletion is **manual** today (no in-app button, no RPC). To delete a user:
   `delete from auth.users where id = '<uuid>';` in the Supabase SQL editor (profile, progress, results,

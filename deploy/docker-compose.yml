@@ -1,4 +1,4 @@
-# RONRIKU self-hosting: Next.js (web) behind Caddy, with the Supabase CLI stack as backend.
+# Odlet self-hosting: Next.js (web) behind Caddy, with the Supabase CLI stack as backend.
 #   cp deploy/.env.example deploy/.env   (deploy/up.sh fills it)
 #   docker compose -f deploy/docker-compose.yml --env-file deploy/.env up -d --build
 # Supabase (`supabase start` in backend/) must be running first: web and caddy join its network.

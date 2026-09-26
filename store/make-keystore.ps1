@@ -1,6 +1,6 @@
 <#
 .SYNOPSIS
-  Creates the RONRIKU release signing key (Android keystore) OUTSIDE the repository.
+  Creates the ODLET release signing key (Android keystore) OUTSIDE the repository.
 
 .DESCRIPTION
   Uses keytool from Unity's bundled OpenJDK. Prompts for the password (never on the command line, never
@@ -19,7 +19,7 @@
 param(
   [string]$OutFile = (Join-Path $HOME "ronriku-keys\ronriku-dappstore.keystore"),
   [string]$Alias = "ronriku",
-  [string]$DName = "CN=RONRIKU, O=RONRIKU",
+  [string]$DName = "CN=ODLET, O=ODLET",
   [string]$Keytool = "D:\6000.6.0f1\Editor\Data\PlaybackEngines\AndroidPlayer\OpenJDK\bin\keytool.exe"
 )
 $ErrorActionPreference = "Stop"

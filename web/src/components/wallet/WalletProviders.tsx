@@ -15,7 +15,7 @@ async function registerMobileWalletAdapter() {
   try {
     const mwa = await import("@solana-mobile/wallet-standard-mobile");
     mwa.registerMwa({
-      appIdentity: { name: "RONRIKU", uri: window.location.origin, icon: "/icon.png" },
+      appIdentity: { name: "Odlet", uri: window.location.origin, icon: "/icon.png" },
       authorizationCache: mwa.createDefaultAuthorizationCache(),
       chains: ["solana:devnet"],
       chainSelector: mwa.createDefaultChainSelector(),

@@ -41,7 +41,7 @@ export default function LandingPage() {
               textShadow: "0 4px 0 #135b73, 0 8px 0 #0b3b4a, 0 0 32px rgb(17 197 179 / 0.45)",
             }}
           >
-            RONRIKU
+            ODLET
           </h1>
           <p className="mt-6 max-w-[440px] text-[18px] leading-7 text-text">
             Every card is a puzzle. Solve fast, stack combos, watch chips × mult flatten the monster.
@@ -162,7 +162,7 @@ export default function LandingPage() {
           </div>
         </div>
         <footer className="mt-12 flex flex-wrap items-center justify-between gap-4 border-t-2 border-line pt-6 font-pixel text-[10px] text-muted">
-          <span>© RONRIKU · Early access · collectibles on Solana devnet (test SOL, no real funds)</span>
+          <span>© ODLET · Early access · collectibles on Solana devnet (test SOL, no real funds)</span>
           <span className="flex gap-4">
             <Link href="/privacy" className="hover:text-text">Privacy</Link>
             <Link href="/terms" className="hover:text-text">Terms</Link>

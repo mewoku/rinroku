@@ -27,7 +27,7 @@ export const EndCard: React.FC<{ cta: string; small?: string }> = ({ cta, small 
         <div
           style={{
             fontFamily: FONT_DISPLAY,
-            fontWeight: 700,
+            fontWeight: 400, // Silkscreen Bold fills the O and D counters: "ODLET" reads as blobs
             fontSize: 150,
             color: C.teal,
             letterSpacing: 4,
@@ -36,7 +36,7 @@ export const EndCard: React.FC<{ cta: string; small?: string }> = ({ cta, small 
             opacity: logo,
           }}
         >
-          RONRIKU
+          ODLET
         </div>
         <div style={{ fontFamily: FONT_DISPLAY, fontSize: 64, color: C.yellow, opacity: tag }}>SOLVE TO STRIKE</div>
         <div

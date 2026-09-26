@@ -84,7 +84,7 @@ allowed_cidrs_v6 = ["::/0"]
 # enabled = true
 
 [realtime]
-# Unused by RONRIKU; disabled to save memory locally.
+# Unused by Odlet; disabled to save memory locally.
 enabled = false
 # Bind realtime via either IPv4 or IPv6. (default: IPv4)
 # ip_version = "IPv6"

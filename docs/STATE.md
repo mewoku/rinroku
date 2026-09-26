@@ -1,4 +1,6 @@
-# Current State
+# ODLET — Current State
+
+Product name: **ODLET** (Odlet in running text), formerly RONRIKU; site https://odlet.xyz (odlet.fun also owned). Code identifiers, the `Ronriku` Unity folders/namespaces and the `@ronriku/core` package keep the old name internally.
 
 Updated: 2026-09-26. Plan and contracts: `docs/PLAN_V2.md` (platform) and `docs/PLAN_V3.md` (arcade adventure, music).
 
@@ -31,7 +33,7 @@ Updated: 2026-09-26. Plan and contracts: `docs/PLAN_V2.md` (platform) and `docs/
 - **Difficulty**: Daily trials use the Standard band; arcade levels use tier 0 for W1 L1–6 and tier 1 elsewhere (no per-world ramp).
 - **Online**: `Infrastructure/Online` — anonymous Supabase session over UnityWebRequest, offline-first; when connected the server is authoritative (shards, rating, streak, figures, levels) and results are submitted as answers + move/reset counts for server replay.
 - **Tests**: EditMode 35, PlayMode 3 (offline), Online 1 (end-to-end vs local Supabase), Capture (screenshots at 3 aspect ratios → `docs/evidence/`).
-- **Builds**: `RONRIKU/Build Android (Release)` → `Builds/Android/RONRIKU.apk` (~16 MB); `(Development)` → `RONRIKU-dev.apk`; `RONRIKU/Build WebGL (Website)` → `web/public/unity/`.
+- **Builds**: `RONRIKU/Build Android (Release)` → `Builds/Android/ODLET.apk` (~16 MB); `(Development)` → `ODLET-dev.apk`; `RONRIKU/Build WebGL (Website)` → `web/public/unity/`.
 
 ## Backend (`backend/`)
 

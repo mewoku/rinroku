@@ -1,9 +1,10 @@
-"""RONRIKU icon + store art generator.
+"""ODLET icon + store art generator.
 
 Everything is drawn at native pixel resolution and upscaled nearest-neighbour, so every output is
 true pixel art. Re-run after changing the design:
 
     python store/tools/make_art.py
+    python store/tools/make_art.py --store-only   # store/media only; leaves client/ untouched
 
 Outputs:
   client/Assets/Ronriku/Art/Icon/*.png   app icon master, adaptive layers, legacy + round sizes
@@ -295,8 +296,7 @@ def round_mask(img: Image.Image) -> Image.Image:
     return out
 
 
-def build_icons() -> dict[str, Image.Image]:
-    ICON_DIR.mkdir(parents=True, exist_ok=True)
+def build_icons(save: bool = True) -> dict[str, Image.Image]:
     out: dict[str, Image.Image] = {}
 
     # master 512 = 32 grid x16 (full-bleed square; stores apply their own mask)
@@ -324,8 +324,10 @@ def build_icons() -> dict[str, Image.Image]:
         for layer in ("bg", "fg"):
             out[f"ronriku-adaptive-{layer}-{size}.png"] = out[f"ronriku-adaptive-{layer}-{src}.png"].resize((size, size), Image.BOX)
 
-    for name, im in out.items():
-        im.save(ICON_DIR / name, optimize=True)
+    if save:
+        ICON_DIR.mkdir(parents=True, exist_ok=True)
+        for name, im in out.items():
+            im.save(ICON_DIR / name, optimize=True)
     return out
 
 
@@ -359,11 +361,45 @@ def pixel_text(img: Image.Image, xy, text: str, font_path: Path, size: int, colo
     return draw.textbbox((x, y), text, font=font, anchor=anchor)
 
 
-def wordmark(img: Image.Image, cx: int, y: int, size: int) -> None:
-    """RONRIKU in Silkscreen Bold with a teal/pink offset glow."""
-    pixel_text(img, (cx + 2, y + 2), "RONRIKU", SILK_BOLD, size, PINK_DK, anchor="mt", spacing=1)
-    pixel_text(img, (cx + 1, y + 1), "RONRIKU", SILK_BOLD, size, PINK, anchor="mt", spacing=1)
-    pixel_text(img, (cx, y), "RONRIKU", SILK_BOLD, size, TEAL_HI, anchor="mt", spacing=1)
+WORDMARK = "ODLET"
+
+# Hand-drawn bitmap wordmark (2-cell strokes). A font "O" next to "D" reads as "QD"/"DD" at pixel
+# sizes, so the letters are drawn here: round O, square-backed D.
+WORDMARK_GLYPHS = {
+    "O": ["..XXX..", ".XXXXX.", "XX...XX", "XX...XX", "XX...XX", "XX...XX", "XX...XX", ".XXXXX.", "..XXX.."],
+    "D": ["XXXXX..", "XXXXXX.", "XX..XXX", "XX...XX", "XX...XX", "XX...XX", "XX..XXX", "XXXXXX.", "XXXXX.."],
+    "L": ["XX....", "XX....", "XX....", "XX....", "XX....", "XX....", "XX....", "XXXXXX", "XXXXXX"],
+    "E": ["XXXXXX", "XXXXXX", "XX....", "XX....", "XXXXX.", "XX....", "XX....", "XXXXXX", "XXXXXX"],
+    "T": ["XXXXXX", "XXXXXX", "..XX..", "..XX..", "..XX..", "..XX..", "..XX..", "..XX..", "..XX.."],
+}
+
+
+def _wordmark_layer(img: Image.Image, x0: int, y0: int, k: int, color) -> None:
+    px = img.load()
+    x = x0
+    for ch in WORDMARK:
+        rows = WORDMARK_GLYPHS[ch]
+        for gy, row in enumerate(rows):
+            for gx, c in enumerate(row):
+                if c != "X":
+                    continue
+                for yy in range(k):
+                    for xx in range(k):
+                        X, Y = x + gx * k + xx, y0 + gy * k + yy
+                        if 0 <= X < img.width and 0 <= Y < img.height:
+                            px[X, Y] = color
+        x += (len(rows[0]) + 2) * k
+
+
+def wordmark(img: Image.Image, cx: int, y: int, size: int) -> int:
+    """ODLET bitmap wordmark (cap height ~ size * 1.1) with a teal/pink offset glow; centred on cx, top at y. Returns the bottom y (incl. glow)."""
+    k = max(1, round(size / 8))
+    width = sum((len(WORDMARK_GLYPHS[ch][0]) + 2) * k for ch in WORDMARK) - 2 * k
+    x0 = cx - width // 2
+    _wordmark_layer(img, x0 + 2, y + 2, k, PINK_DK)
+    _wordmark_layer(img, x0 + 1, y + 1, k, PINK)
+    _wordmark_layer(img, x0, y, k, TEAL_HI)
+    return y + len(WORDMARK_GLYPHS["O"]) * k + 2
 
 
 # ---------------------------------------------------------------------------------------------
@@ -398,11 +434,9 @@ def feature_graphic(w_native: int, h_native: int, scale: int, tagline: str, layo
     img = scene_backdrop(w_native, h_native)
     if layout == "wide":
         # wordmark left, stage right
-        wordmark(img, int(w_native * 0.36), int(h_native * 0.26), 16 if h_native < 140 else 24)
-        pixel_text(img, (int(w_native * 0.36), int(h_native * 0.26) + (22 if h_native < 140 else 32)), tagline,
-                   SILK, 8, GOLD, shadow=OUTLINE, anchor="mt")
-        pixel_text(img, (int(w_native * 0.36), int(h_native * 0.26) + (34 if h_native < 140 else 46)),
-                   "BATTLES  RUNES  DASH  BEATS", SILK, 8, MUTED, anchor="mt")
+        bottom = wordmark(img, int(w_native * 0.36), int(h_native * 0.26), 16 if h_native < 140 else 24)
+        pixel_text(img, (int(w_native * 0.36), bottom + 6), tagline, SILK, 8, GOLD, shadow=OUTLINE, anchor="mt")
+        pixel_text(img, (int(w_native * 0.36), bottom + 18), "BATTLES  RUNES  DASH  BEATS", SILK, 8, MUTED, anchor="mt")
         cx = int(w_native * 0.78)
         floor_y = int(h_native * 0.80)
         a = 18 if h_native < 140 else 20
@@ -410,12 +444,12 @@ def feature_graphic(w_native: int, h_native: int, scale: int, tagline: str, layo
         small_cube(img, cx - 34, floor_y - 12, 5, (TEAL, TEAL_DK, TEAL_DEEP))
         small_cube(img, cx + 32, floor_y - 18, 6, (PINK, PINK_DK, VIOLET))
         small_cube(img, cx + 22, floor_y - 58, 3, (GOLD, GOLD_DK, hexc("7A4E08")))
-        for (sx, sy, c) in ((cx - 26, floor_y - 52, GOLD), (cx + 30, floor_y - 40, TEAL_HI), (cx - 40, floor_y - 30, PINK)):
+        for (sx, sy, c) in ((cx - 26, floor_y - 52, GOLD), (cx + 30, floor_y - 40, TEAL_HI), (cx - 30, floor_y - 34, PINK)):
             sparkle(img, sx, sy, c)
     else:  # square
         cx = w_native // 2
-        wordmark(img, cx, int(h_native * 0.10), 24)
-        pixel_text(img, (cx, int(h_native * 0.10) + 34), tagline, SILK, 8, GOLD, shadow=OUTLINE, anchor="mt")
+        bottom = wordmark(img, cx, int(h_native * 0.10), 24)
+        pixel_text(img, (cx, bottom + 8), tagline, SILK, 8, GOLD, shadow=OUTLINE, anchor="mt")
         floor_y = int(h_native * 0.82)
         hero_stage(img, cx, floor_y, 36)
         small_cube(img, cx - 90, floor_y - 30, 10, (TEAL, TEAL_DK, TEAL_DEEP))
@@ -498,8 +532,10 @@ def build_screenshots() -> None:
 
 
 if __name__ == "__main__":
-    icons = build_icons()
+    import sys
+    store_only = "--store-only" in sys.argv
+    icons = build_icons(save=not store_only)
     build_store_graphics(icons)
     build_screenshots()
-    print("icons ->", ICON_DIR)
+    print("icons ->", "(not written: --store-only)" if store_only else ICON_DIR)
     print("store media ->", MEDIA_DIR)

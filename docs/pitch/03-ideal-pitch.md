@@ -1,4 +1,6 @@
-# RONRIKU — The Ideal Pitch
+# ODLET — The Ideal Pitch
+
+> Renamed: RONRIKU is now **ODLET** (odlet.xyz), 26 September 2026. Product name updated below; the plan and findings are unchanged.
 
 > A rewrite that answers `02-roast.md`. It has one hook, one audience wedge, honest crypto and honest numbers. Anything marked **TBD** or **target** is not a fact yet. Fill it in from launch-week data, never invent it.
 >
@@ -10,7 +12,7 @@
 
 ## 1. Hook (the bar test)
 
-**RONRIKU: Solve to strike.**
+**ODLET: Solve to strike.**
 Balatro-style combos where every card is a puzzle. A one-minute monster fight on your Seeker, and one Daily a day to prove your brain.
 
 *Visual: the battle screen mid-hit, with the chips × mult box `20 × 1` and a `-20` pop on the monster.*
@@ -103,7 +105,7 @@ Unit economics: mint rent and fees are paid by the buyer's wallet and the store 
 | Wordle / NYT / Puzzmo | ● | ●●● | ●● | ○ |
 | Elevate / Peak | ● | ●● | ●●● | ○ |
 | Typical dApp Store app | ○ | ● (quests) | ●● | ●● |
-| **RONRIKU** | ●● | ●● | ●●● (Seeker) | ●● |
+| **ODLET** | ●● | ●● | ●●● (Seeker) | ●● |
 
 We don't out-Balatro Balatro. We're the **free, 1-minute, daily** version where the cards are puzzles, and the only one built for Seeker first.
 
@@ -122,7 +124,7 @@ Proposed, for the owner to confirm (the pitch skill requires a specific ask):
 2. **Grant**: **$25K** (Solana Foundation / Solana Mobile builder programs) to fund 3 months of mainnet launch, the Season 1 content drop and device QA. **Milestone:** 5,000 installs and D7 ≥ 15 % by 2026-12-31, reported publicly.
 3. **Community**: play the Daily for 7 days, share your grid, and tell us where you quit.
 
-**RONRIKU: solve to strike.**
+**ODLET: solve to strike.**
 
 ---
 

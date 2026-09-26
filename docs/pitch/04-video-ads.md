@@ -1,4 +1,6 @@
-# RONRIKU — Video Ad Plan
+# ODLET — Video Ad Plan
+
+> Renamed: RONRIKU is now **ODLET** (odlet.xyz), 26 September 2026. Product name updated below; the plan and findings are unchanged. The end-card source (`marketing/video/src`) now says ODLET, but already rendered MP4s still show RONRIKU until they are re-rendered.
 
 Three concepts built on the hook from `03-ideal-pitch.md`: **Solve to strike.** A right answer *hits*: chips × mult, a combo, a shake. That moment is the first frame of every ad.
 
@@ -56,7 +58,7 @@ Tip: do the recordings in the same session as the pre-launch device pass (roast 
 | 6.9–8.6 | `beat-crawl` | **MOVE ON THE BEAT.** | The beat bar in the clip is synced to the music |
 | 8.6–9.9 | `battle-ko` | **K.O.** | `stinger_victory` |
 | 9.9–11.6 | `daily` | **ONE DAILY. ONE RATING.** | Rating count-up |
-| 11.6–15.0 | End card: logo, voxel hero, CTA | **RONRIKU** / **SOLVE TO STRIKE** / **FREE ON SEEKER · dApp Store** | Music resolves, 0.5 s fade |
+| 11.6–15.0 | End card: logo, voxel hero, CTA | **ODLET** / **SOLVE TO STRIKE** / **FREE ON SEEKER · dApp Store** | Music resolves, 0.5 s fade |
 
 Post copy: "your brain is the weapon. free on the Solana dApp Store (Seeker) + in your browser #puzzle #roguelite #solana"
 
@@ -75,7 +77,7 @@ Post copy: "your brain is the weapon. free on the Solana dApp Store (Seeker) + i
 | 15.5–19.5 | `boss` | **THEN THE BOSS.** | Switch to the boss track, red ambient |
 | 19.5–23 | `daily` | **ONE DAILY. A REAL RATING.** | Blue ambient |
 | 23–26 | `shop` | **COLLECT VOXEL HEROES** / small: *collectibles on Solana (devnet in early access)* | — |
-| 26–30 | End card | **RONRIKU** / **SOLVE TO STRIKE** / **FREE ON THE SOLANA dApp STORE** | Menu track, fade out |
+| 26–30 | End card | **ODLET** / **SOLVE TO STRIKE** / **FREE ON THE SOLANA dApp STORE** | Menu track, fade out |
 
 The honesty line on the shop shot is deliberate (see the roast). Drop "(devnet in early access)" once mints are on mainnet.
 
@@ -87,7 +89,7 @@ The first draft overlaid a "20 × 6" box on a hit that the game scores 20 × 1. 
 |---|---|---|---|
 | 0.0–1.4 | `battle`: the tap-3-that-make-16 answer lands for -20 | **SOLVE.** | `stinger_combo` on the hit, quiet HeroRun bed |
 | 1.4–3.0 | `battle`: combo 4, 25 × 4 = **-100**, K.O. and VICTORY | **STRIKE.** | `stinger_victory` |
-| 3.0–6.0 | End card | **RONRIKU · SOLVE TO STRIKE** / **ON SEEKER** | Bed fades out |
+| 3.0–6.0 | End card | **ODLET · SOLVE TO STRIKE** / **ON SEEKER** | Bed fades out |
 
 ### Original bumper draft (superseded)
 
@@ -97,7 +99,7 @@ The first draft overlaid a "20 × 6" box on a hit that the game scores 20 × 1. 
 |---|---|---|---|
 | 0.0–2.0 | `battle-combo`, full-bleed, the biggest hit | **20 × 6** (the chips × mult box slams in) | `stinger_combo` |
 | 2.0–3.5 | `battle-ko` | **K.O.** | `stinger_victory` |
-| 3.5–6.0 | End card | **RONRIKU · SOLVE TO STRIKE** / **ON SEEKER** | Tail of the stinger |
+| 3.5–6.0 | End card | **ODLET · SOLVE TO STRIKE** / **ON SEEKER** | Tail of the stinger |
 
 ---
 

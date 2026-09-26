@@ -1,4 +1,4 @@
-# RONRIKU — Solana dApp Store listing data.
+# ODLET — Solana dApp Store listing data.
 #
 # NOTE (checked 2026-09-26): the dapp-store CLI no longer reads this file. The legacy
 # init/create/validate/publish flows were removed; new apps are created in the Publisher Portal
@@ -7,23 +7,23 @@
 # This file keeps the listing data in the legacy schema so every portal field has one source of truth
 # (and it still works with the legacy CLI if you pin an old version). Paths are relative to store/dapp-store/.
 #
-# Fill every {{...}} before submitting. Never put keypairs or API keys in this file.
+# Fill every {{...}} before submitting (hello@odlet.xyz is a placeholder mailbox the owner must create). Never put keypairs or API keys in this file.
 
 publisher:
-  name: RONRIKU
-  website: "{{https://your-domain}}"
-  email: "{{publisher email}}"
-  support_email: "{{support email}}"
+  name: Odlet
+  website: "https://odlet.xyz"
+  email: "hello@odlet.xyz"            # placeholder: create this mailbox (or replace) before submitting
+  support_email: "hello@odlet.xyz"    # placeholder: same
 
 app:
-  name: RONRIKU
+  name: ODLET
   address: ""                       # App NFT mint, filled in by the portal / legacy CLI
-  android_package: com.ronriku.game
+  android_package: com.odlet.game     # must match the APK (Unity Player Settings)
   urls:
-    license_url: "{{https://your-domain}}/terms"
-    copyright_url: "{{https://your-domain}}/terms"
-    privacy_policy_url: "{{https://your-domain}}/privacy"
-    website: "{{https://your-domain}}"
+    license_url: "https://odlet.xyz/terms"
+    copyright_url: "https://odlet.xyz/terms"
+    privacy_policy_url: "https://odlet.xyz/privacy"
+    website: "https://odlet.xyz"
   media:
     - purpose: icon
       uri: ../media/icon-512.png
@@ -49,15 +49,15 @@ release:
       uri: ../media/screenshots/1080x2400/05.png
   files:
     - purpose: install
-      uri: ../../Builds/Android/RONRIKU.apk   # must be release-signed with the dApp Store key (not debug)
+      uri: ../../Builds/Android/ODLET.apk   # APK file name comes from the Unity build script; must be release-signed with the dApp Store key (not debug)
   catalog:
     en-US:
-      name: RONRIKU
+      name: ODLET
       short_description: Pixel puzzle arcade adventure   # 29 chars; dApp Store limit is 30
       long_description: |
         Beat monsters with your brain.
 
-        RONRIKU is a pixel-art puzzle arcade. Walk a map of five worlds, meet voxel monsters and knock them out with fast little puzzles, then come back every day for three fresh reasoning trials.
+        Odlet is a pixel-art puzzle arcade. Walk a map of five worlds, meet voxel monsters and knock them out with fast little puzzles, then come back every day for three fresh reasoning trials.
 
         FIVE WORLDS, SIXTY LEVELS
         Every world mixes four kinds of play, then ends in a two-phase boss fight.
@@ -82,11 +82,11 @@ release:
         The whole game works without a connection. When online, an anonymous account (no email, no password) keeps your progress, rating and friends, and the server checks results so leaderboards stay fair.
 
         ABOUT SOLANA
-        The Android app has no wallet features and never asks for your keys. On the RONRIKU website you can optionally link a wallet and buy figures with devnet SOL; those figures are minted as Metaplex Core NFTs on Solana devnet, a test network with no real money. Nothing in RONRIKU is an investment.
+        The Android app has no wallet features and never asks for your keys. On the Odlet website (odlet.xyz) you can optionally link a wallet and buy figures with devnet SOL; those figures are minted as Metaplex Core NFTs on Solana devnet, a test network with no real money. Nothing in Odlet is an investment.
 
         No ads. No tracking. No pay-to-win.
       new_in_version: First release — five worlds of arcade puzzle battles, Rune Hand duels, Ice Dash and Beat Crawl, a daily three-trial challenge, weekly bosses, voxel figures and a reactive chiptune soundtrack.
-      saga_features: Tuned for the Seeker's 20:9 display and haptics. No in-app wallet yet; optional devnet figure purchases and wallet linking happen on the RONRIKU website.
+      saga_features: Tuned for the Seeker's 20:9 display and haptics. No in-app wallet yet; optional devnet figure purchases and wallet linking happen on the Odlet website (odlet.xyz).
   android_details:
     locales:
       - en-US

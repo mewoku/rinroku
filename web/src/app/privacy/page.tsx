@@ -5,7 +5,7 @@ import { Contact, LEGAL_UPDATED, LegalList, LegalSection, Strong } from "@/compo
 
 export const metadata: Metadata = {
   title: "Privacy",
-  description: "What RONRIKU stores, why, and how to delete it. No ads, no tracking SDKs.",
+  description: "What Odlet stores, why, and how to delete it. No ads, no tracking SDKs.",
 };
 
 export default function PrivacyPage() {
@@ -14,7 +14,7 @@ export default function PrivacyPage() {
       <PageHeader kicker={`Updated ${LEGAL_UPDATED}`} title="Privacy" />
       <div className="mx-auto max-w-[720px] space-y-6">
         <p className="text-[17px] leading-7 text-text">
-          RONRIKU is a puzzle game. It needs very little about you: no email, no real name, no phone number, no location. There are no ads and no
+          Odlet is a puzzle game. It needs very little about you: no email, no real name, no phone number, no location. There are no ads and no
           analytics or tracking SDKs in the app or on this site.
         </p>
 
@@ -120,7 +120,7 @@ export default function PrivacyPage() {
         </LegalSection>
 
         <LegalSection id="children" title="Children">
-          <p>RONRIKU is not directed at children under 13, and we do not knowingly collect data from them. If you believe a child has an account, contact us and we will delete it.</p>
+          <p>Odlet is not directed at children under 13, and we do not knowingly collect data from them. If you believe a child has an account, contact us and we will delete it.</p>
         </LegalSection>
 
         <LegalSection id="changes" title="Changes and contact">

@@ -1,25 +1,25 @@
-# RONRIKU — store listing
+# ODLET — store listing
 
 Copy for the Solana dApp Store (Publisher Portal) and, later, Google Play. Media lives in `store/media/`
 (regenerate with `python store/tools/make_art.py`).
 
 ## Title
 
-`RONRIKU` (Play limit 30 chars)
+`ODLET` (Play limit 30 chars). Website: https://odlet.xyz
 
-Play subtitle-style name if wanted: `RONRIKU: Pixel Puzzle Arcade` (28 chars)
+Play subtitle-style name if wanted: `ODLET: Pixel Puzzle Arcade` (26 chars)
 
 ## Short description
 
 - **dApp Store (max 30 chars):** `Pixel puzzle arcade adventure` (29)
 - **Google Play (max 80 chars):** `Beat voxel monsters with quick puzzles, rune hands, ice dashes and beat crawls.` (79)
 
-## Full description (≤ 4000 chars; this text is 2,042)
+## Full description (≤ 4000 chars; this text is 2,047)
 
 ```
 Beat monsters with your brain.
 
-RONRIKU is a pixel-art puzzle arcade. Walk a map of five worlds, meet voxel monsters and knock them out with fast little puzzles, then come back every day for three fresh reasoning trials.
+Odlet is a pixel-art puzzle arcade. Walk a map of five worlds, meet voxel monsters and knock them out with fast little puzzles, then come back every day for three fresh reasoning trials.
 
 FIVE WORLDS, SIXTY LEVELS
 Every world mixes four kinds of play, then ends in a two-phase boss fight.
@@ -44,7 +44,7 @@ PLAYS OFFLINE
 The whole game works without a connection. When online, an anonymous account (no email, no password) keeps your progress, rating and friends, and the server checks results so leaderboards stay fair.
 
 ABOUT SOLANA
-The Android app has no wallet features and never asks for your keys. On the RONRIKU website you can optionally link a wallet and buy figures with devnet SOL; those figures are minted as Metaplex Core NFTs on Solana devnet, a test network with no real money. Nothing in RONRIKU is an investment.
+The Android app has no wallet features and never asks for your keys. On the Odlet website (odlet.xyz) you can optionally link a wallet and buy figures with devnet SOL; those figures are minted as Metaplex Core NFTs on Solana devnet, a test network with no real money. Nothing in Odlet is an investment.
 
 No ads. No tracking. No pay-to-win.
 ```
@@ -66,7 +66,7 @@ No ads. No tracking. No pay-to-win.
 
 ## Saga / Seeker features field (dApp Store `saga_features`)
 
-`Tuned for the Seeker's 20:9 display and haptics. No in-app wallet yet: optional devnet figure purchases and wallet linking happen on the RONRIKU website.`
+`Tuned for the Seeker's 20:9 display and haptics. No in-app wallet yet: optional devnet figure purchases and wallet linking happen on the Odlet website (odlet.xyz).`
 
 ## Category
 

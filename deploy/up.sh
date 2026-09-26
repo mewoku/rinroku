@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# RONRIKU self-host bootstrap: fresh Ubuntu VPS (22.04/24.04) → site on https://$DOMAIN.
+# Odlet self-host bootstrap: fresh Ubuntu VPS (22.04/24.04) → site on https://$DOMAIN.
 #
 #   curl -fsSL https://raw.githubusercontent.com/<you>/RONRIKU/main/deploy/up.sh -o up.sh
-#   DOMAIN=play.example.com REPO_URL=https://github.com/<you>/RONRIKU.git bash up.sh
+#   DOMAIN=odlet.xyz REPO_URL=https://github.com/<you>/RONRIKU.git bash up.sh
 #
-# Or from an existing checkout:   DOMAIN=play.example.com bash deploy/up.sh
+# Or from an existing checkout:   bash deploy/up.sh      (DOMAIN defaults to odlet.xyz)
 # Local (Docker Desktop, Git Bash): bash deploy/up.sh --local      (http://localhost:8080)
 #
 # Idempotent: safe to re-run after `git pull` (rebuilds, applies new migrations, keeps data).
@@ -13,7 +13,7 @@
 #   --no-install   skip OS packages (Docker, Node) even on a server
 #   --reset        wipe the database (`supabase db reset`). Server: automatic on the first run only.
 #                  Local: never automatic (your dev data is kept) — pass --reset on a fresh clone.
-# Env: DOMAIN, REPO_URL, APP_DIR (default ~/RONRIKU), SUPABASE_EXCLUDE (e.g. "studio,imgproxy"),
+# Env: DOMAIN (default odlet.xyz), REPO_URL, APP_DIR (default ~/RONRIKU), SUPABASE_EXCLUDE (e.g. "studio,imgproxy"),
 #      PAYMENT_RECIPIENT (default: owner wallet), SUPABASE_CLI (default supabase@2.118.0).
 set -euo pipefail
 
@@ -140,7 +140,7 @@ if [ "$LOCAL" = 1 ]; then
   setenv BIND_ADDR "127.0.0.1"; setenv HTTP_PORT "${HTTP_PORT:-8080}"; setenv HTTPS_PORT "${HTTPS_PORT:-8443}"
 else
   [ -n "${DOMAIN:-}" ] || DOMAIN="$(getenv DOMAIN)"
-  case "${DOMAIN:-}" in ""|:*) die "Set DOMAIN=your.domain (DNS A/AAAA record → this server)." ;; esac
+  case "${DOMAIN:-}" in ""|:*) DOMAIN="odlet.xyz" ;; esac
   setenv DOMAIN "$DOMAIN"; setenv SITE_URL "https://$DOMAIN"
   setenv BIND_ADDR "0.0.0.0"; setenv HTTP_PORT 80; setenv HTTPS_PORT 443
 fi
@@ -172,5 +172,5 @@ for _ in $(seq 1 60); do curl -fsS -o /dev/null "$URL/" && break; sleep 2; done
 curl -fsS -o /dev/null -w "home %{http_code}\n" "$URL/"
 curl -fsS -o /dev/null -w "rest %{http_code}\n" -H "apikey: $ANON" "$URL/rest/v1/shop_shelf?select=day&limit=1"
 echo
-echo "RONRIKU is up at $URL"
+echo "Odlet is up at $URL"
 echo "Unity client config: backend URL $URL, anon key = SUPABASE_ANON_KEY in deploy/.env"

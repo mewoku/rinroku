@@ -3,7 +3,7 @@ export async function register() {
   if (process.env.NEXT_RUNTIME !== "nodejs") return;
   if (!process.env.MINT_AUTHORITY_SECRET_KEY && !process.env.NEXT_PUBLIC_PAYMENT_RECIPIENT) return; // SOL purchases not configured
   if (process.env.TREASURY_SECRET_KEY || process.env.NEXT_PUBLIC_TREASURY_PUBKEY) {
-    console.warn("[ronriku] TREASURY_SECRET_KEY / NEXT_PUBLIC_TREASURY_PUBKEY are obsolete: use MINT_AUTHORITY_SECRET_KEY + NEXT_PUBLIC_PAYMENT_RECIPIENT.");
+    console.warn("[odlet] TREASURY_SECRET_KEY / NEXT_PUBLIC_TREASURY_PUBKEY are obsolete: use MINT_AUTHORITY_SECRET_KEY + NEXT_PUBLIC_PAYMENT_RECIPIENT.");
   }
   let reason: string | null = null;
   try {
@@ -11,10 +11,10 @@ export async function register() {
     const authority = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(process.env.MINT_AUTHORITY_SECRET_KEY ?? "[]") as number[])).publicKey.toBase58();
     const recipient = new PublicKey(process.env.NEXT_PUBLIC_PAYMENT_RECIPIENT ?? "").toBase58();
     if (recipient === authority) reason = "NEXT_PUBLIC_PAYMENT_RECIPIENT must not be the mint authority";
-    else console.log(`[ronriku] SOL purchases: payments → ${recipient}, mint authority ${authority} (needs no SOL)`);
+    else console.log(`[odlet] SOL purchases: payments → ${recipient}, mint authority ${authority} (needs no SOL)`);
   } catch {
     reason = "MINT_AUTHORITY_SECRET_KEY or NEXT_PUBLIC_PAYMENT_RECIPIENT missing or malformed";
   }
   // The purchase routes re-check this on every request (lib/server/env.ts solConfig).
-  if (reason) console.error(`[ronriku] SOL purchases disabled: ${reason}`);
+  if (reason) console.error(`[odlet] SOL purchases disabled: ${reason}`);
 }

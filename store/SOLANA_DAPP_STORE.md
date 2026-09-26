@@ -1,4 +1,4 @@
-# Publishing RONRIKU on the Solana dApp Store
+# Publishing ODLET on the Solana dApp Store
 
 Checked 2026-09-26 against docs.solanamobile.com and `@solana-mobile/dapp-store-cli@1.0.1`.
 
@@ -23,8 +23,8 @@ from; the CLI no longer reads it.
 | SOL | Solana Mobile says **~0.2 SOL** in the publisher wallet for transaction fees + storage uploads. The CLI refuses to start below **0.016 SOL** on the signer. Budget **0.25 SOL**; each later release costs a fraction of that. |
 | Storage (ArDrive) | The portal recommends ArDrive for Arweave uploads; use its cost estimator (APK ≈ 21 MB + ~6 MB media) and top up the ArDrive balance before submitting. |
 | Signed release APK | Release build signed with **your own key** — debug-signed builds are rejected. The key must **not** be a Google Play signing key (the dApp Store rejects APKs signed by an existing Play key). See "Release signing" below. |
-| Public HTTPS URLs | Website, privacy policy (`/privacy`) and terms (`/terms`) on a real domain. Localhost links will fail review. |
-| Contact emails | Publisher email and support email (also set `CONTACT_EMAIL` in `deploy/.env` so `/privacy` shows it). |
+| Public HTTPS URLs | https://odlet.xyz, https://odlet.xyz/privacy and https://odlet.xyz/terms must be live (deploy `deploy/` with `DOMAIN=odlet.xyz`). Localhost links will fail review. |
+| Contact emails | Publisher + support email: `hello@odlet.xyz` (placeholder: create the mailbox first; also set `CONTACT_EMAIL` in `deploy/.env` so `/privacy` shows it). |
 | Media | `store/media/` — see `store/listing.md` media table (icon 512², banner 1200×600, feature 1200², ≥4 screenshots ≥1080 px, same orientation). |
 
 ## Step by step (first release)
@@ -58,21 +58,21 @@ from; the CLI no longer reads it.
    ```powershell
    $env:JAVA_HOME = "D:\6000.6.0f1\Editor\Data\PlaybackEngines\AndroidPlayer\OpenJDK"
    $bt = "D:\6000.6.0f1\Editor\Data\PlaybackEngines\AndroidPlayer\SDK\build-tools\36.0.0"
-   & "$bt\apksigner.bat" verify --print-certs Builds\Android\RONRIKU.apk     # DN must NOT be CN=Android Debug
-   & "$bt\aapt2.exe" dump badging Builds\Android\RONRIKU.apk | Select-String "package:|targetSdk|uses-permission|native-code"
+   & "$bt\apksigner.bat" verify --print-certs Builds\Android\ODLET.apk     # DN must NOT be CN=Android Debug
+   & "$bt\aapt2.exe" dump badging Builds\Android\ODLET.apk | Select-String "package:|targetSdk|uses-permission|native-code"
    ```
-   Expect `package: name='com.ronriku.game' versionCode='1' versionName='1.0'`, targetSdk 36,
+   Expect `package: name='com.odlet.game' versionCode='1' versionName='1.0'`, targetSdk 36,
    permissions INTERNET + VIBRATE only, `native-code: 'arm64-v8a'`.
 
-5. **Install it on the Seeker/Pixel and smoke-test** (`adb install -r Builds\Android\RONRIKU.apk`):
+5. **Install it on the Seeker/Pixel and smoke-test** (`adb install -r Builds\Android\ODLET.apk`):
    launch, W1 L1 battle, Daily, airplane mode (offline), relaunch. Reviewers do exactly this.
 
 6. **Publisher Portal:** sign in → complete profile + KYC/KYB → connect the publisher wallet (≥0.25 SOL)
    → set up storage (ArDrive, top up) → **Add a dApp → New dApp**: paste fields from
-   `store/listing.md` / `config.yaml` (name, package `com.ronriku.game`, category Games, short
+   `store/listing.md` / `config.yaml` (name `ODLET`, package `com.odlet.game`, category Games, short
    description ≤30 chars, long description, URLs, testing instructions) and upload media.
 
-7. **New Version** → upload `Builds/Android/RONRIKU.apk`, "what's new" text → sign the prompted
+7. **New Version** → upload `Builds/Android/ODLET.apk`, "what's new" text → sign the prompted
    messages/transactions (Arweave uploads + App/Release NFT mints).
 
 8. **Review:** the app enters the queue automatically. Results come by email from
@@ -87,7 +87,7 @@ npm install -g @solana-mobile/dapp-store-cli          # Node >= 18
 # 1. Bump versionCode (and versionName) — see RELEASE_CHECKLIST.md §1 — and rebuild signed with the SAME key.
 # 2. Create an API key: Publisher Portal → Settings → API keys.
 $env:DAPP_STORE_API_KEY = Read-Host "portal API key"
-dapp-store --apk-file Builds\Android\RONRIKU.apk --keypair "$HOME\ronriku-keys\publisher.json" --whats-new "Bug fixes and balance"
+dapp-store --apk-file Builds\Android\ODLET.apk --keypair "$HOME\ronriku-keys\publisher.json" --whats-new "Bug fixes and balance"
 # interrupted? dapp-store resume --release-id <id> --keypair ...
 ```
 
@@ -97,7 +97,7 @@ wallet's key (if your publisher wallet lives only in a browser extension, create
 *that* as the publisher wallet — confirm in the portal which signer it accepts). Keep keypairs and the
 API key out of the repo.
 
-Rules for every update: same package `com.ronriku.game`, **same signing key**, **higher versionCode**.
+Rules for every update: same package `com.odlet.game`, **same signing key**, **higher versionCode**.
 
 ## Release signing — reference
 

@@ -1,9 +1,9 @@
-# Single origin for RONRIKU:
+# Single origin for Odlet:
 #   /rest/v1 /auth/v1 /functions/v1 /storage/v1 /realtime/v1  → Supabase Kong
 #   /unity/*                                                    → Unity WebGL files (mounted, served here)
 #   everything else                                             → Next.js (web:3000)
 #
-# DOMAIN: a real hostname (e.g. play.example.com) → automatic HTTPS (Let's Encrypt) on :80/:443.
+# DOMAIN: a real hostname (e.g. odlet.xyz) → automatic HTTPS (Let's Encrypt) on :80/:443.
 #         ":80" → plain HTTP on every host name (local use; compose maps it to 127.0.0.1:8080).
 {
 	admin off

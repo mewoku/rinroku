@@ -2,7 +2,7 @@
   "name": "ronriku-marketing-video",
   "private": true,
   "version": "0.1.0",
-  "description": "RONRIKU video ads (Remotion). Plan: docs/pitch/04-video-ads.md",
+  "description": "ODLET video ads (Remotion). Plan: docs/pitch/04-video-ads.md",
   "type": "module",
   "scripts": {
     "prepare:assets": "node scripts/prepare.mjs",

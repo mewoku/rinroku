@@ -1,6 +1,6 @@
 # Third-party notices
 
-RONRIKU's own code is MIT licensed (see `LICENSE`). It includes or depends on the following.
+Odlet's own code is MIT licensed (see `LICENSE`). It includes or depends on the following.
 
 ## Fonts (SIL Open Font License 1.1)
 

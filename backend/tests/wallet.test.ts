@@ -22,7 +22,7 @@ describe("wallet-link edge function", () => {
     const issued = await call(p, { action: "nonce" });
     expect(issued.status).toBe(200);
     expect(issued.body.message).toContain(p.id);
-    expect(issued.body.message.startsWith("ronriku.local wants you to link your Solana wallet to RONRIKU.")).toBe(true);
+    expect(issued.body.message.startsWith("odlet.xyz wants you to link your Solana wallet to Odlet.")).toBe(true);
 
     const forged = nacl.sign.detached(new TextEncoder().encode(issued.body.message), nacl.sign.keyPair().secretKey);
     expect((await call(p, { action: "verify", address, signature: bs58.encode(forged) })).status).toBe(422);

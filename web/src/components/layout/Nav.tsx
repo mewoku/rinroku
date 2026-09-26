@@ -21,12 +21,12 @@ function isActive(path: string, item: { href: string; also?: string[] }) {
 
 export function Logo({ size = 20 }: { size?: number }) {
   return (
-    <Link href="/" className="group flex items-center gap-2" aria-label="RONRIKU home">
+    <Link href="/" className="group flex items-center gap-2" aria-label="Odlet home">
       <span aria-hidden="true" className="relative grid size-8 place-items-center bg-teal" style={{ boxShadow: "inset -4px -4px 0 0 #135b73, 0 0 16px -2px rgb(17 197 179 / 0.6)" }}>
         <span className="size-3 bg-yellow" style={{ boxShadow: "inset -2px -2px 0 0 #b8ab1f" }} />
       </span>
       <span className="font-pixel text-text group-hover:text-teal" style={{ fontSize: size, lineHeight: `${size}px` }}>
-        RONRIKU
+        ODLET
       </span>
     </Link>
   );

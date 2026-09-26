@@ -17,7 +17,8 @@ export const publicEnv = {
   solanaRpcUrl: process.env.NEXT_PUBLIC_SOLANA_RPC_URL || "https://api.devnet.solana.com",
   /** Wallet that receives SOL payments (public address; its secret key never touches this server). */
   paymentRecipient: process.env.NEXT_PUBLIC_PAYMENT_RECIPIENT ?? "",
-  siteUrl: (process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000").replace(/\/$/, ""),
+  /** Canonical public origin (metadataBase, on-chain NFT metadata URIs). Set it to http://localhost:3000 in dev. */
+  siteUrl: (process.env.NEXT_PUBLIC_SITE_URL || "https://odlet.xyz").replace(/\/$/, ""),
   /** Public support / privacy contact shown on /privacy and /terms (store listings require one). */
   contactEmail: process.env.NEXT_PUBLIC_CONTACT_EMAIL ?? "",
 } as const;

@@ -1,6 +1,6 @@
 import type { FigureRecord } from "./types";
 
-export const COLLECTION_SYMBOL = "RNRK";
+export const COLLECTION_SYMBOL = "ODLET";
 
 export interface MetaplexMetadata {
   name: string;
@@ -28,9 +28,9 @@ export function buildFigureMetadata(
     for (const [k, v] of Object.entries(traits)) attributes.push({ trait_type: k, value: typeof v === "boolean" ? (v ? "Yes" : "No") : v });
   }
   return {
-    name: `${fig.name || "RONRIKU"} #${fig.id.slice(0, 8)}`.slice(0, 32),
+    name: `${fig.name || "ODLET"} #${fig.id.slice(0, 8)}`.slice(0, 32),
     symbol: COLLECTION_SYMBOL,
-    description: `A ${fig.rarity} ${fig.tier}×${fig.tier} RONRIKU voxel figure. Encoding: ${fig.encoding}`,
+    description: `A ${fig.rarity} ${fig.tier}×${fig.tier} Odlet voxel figure. Encoding: ${fig.encoding}`,
     image,
     external_url: `${origin}/market`,
     attributes,

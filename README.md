@@ -1,6 +1,6 @@
-# RONRIKU
+# ODLET
 
-A pixel-art reasoning game for Android / Solana Seeker and the browser. Walk an adventure map of voxel monsters you defeat with puzzles, play the three-trial DAILY (Pattern → Shadow → Link), raid weekly bosses, and collect MagicaVoxel-style voxel figures — bought with shards or devnet SOL and minted as Metaplex Core NFTs.
+**Odlet** ([odlet.xyz](https://odlet.xyz)) is a pixel-art reasoning game for Android / Solana Seeker and the browser. Walk an adventure map of voxel monsters you defeat with puzzles, play the three-trial DAILY (Pattern → Shadow → Link), raid weekly bosses, and collect MagicaVoxel-style voxel figures — bought with shards or devnet SOL and minted as Metaplex Core NFTs.
 
 - **Client**: Unity 6000.6 (Android + WebGL), UI Toolkit, pixelated 3D voxel renderer, offline-first.
 - **Backend**: Supabase (Postgres + RLS + RPCs); the server replays submitted answers instead of trusting "solved" flags.
@@ -33,7 +33,7 @@ Unity (open `client/`):
 
 1. Menu **RONRIKU → Setup Fonts** (once; creates static pixel-font atlases).
 2. **RONRIKU → Build WebGL (Website)** → `web/public/unity/` (git-ignored).
-3. **RONRIKU → Build Android (Release)** → `Builds/Android/RONRIKU.apk`. Set `RONRIKU_KEYSTORE`, `RONRIKU_KEYSTORE_PASS`, `RONRIKU_KEY_ALIAS`, `RONRIKU_KEY_PASS` for a store-signed build; otherwise it is debug-signed.
+3. **RONRIKU → Build Android (Release)** → `Builds/Android/ODLET.apk`. Set `RONRIKU_KEYSTORE`, `RONRIKU_KEYSTORE_PASS`, `RONRIKU_KEY_ALIAS`, `RONRIKU_KEY_PASS` for a store-signed build; otherwise it is debug-signed.
 
 ```bash
 pnpm --filter web build && pnpm --filter web start    # http://localhost:3000, game at /play

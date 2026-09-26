@@ -1,8 +1,10 @@
-# Brand — RONRIKU
+# Brand — ODLET
+
+Name: **ODLET** in pixel wordmarks, **Odlet** in running text (formerly RONRIKU). Domain: odlet.xyz.
 
 _Status: established_
 
-RONRIKU feels like a compact reasoning instrument: calm, precise, mysterious, and competitive. The visual language combines a retro pixel interface, minimal low-poly 3D, and an abstract intelligence laboratory.
+Odlet feels like a compact reasoning instrument: calm, precise, mysterious, and competitive. The visual language combines a retro pixel interface, minimal low-poly 3D, and an abstract intelligence laboratory.
 
 ## Palette
 

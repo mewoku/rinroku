@@ -1,14 +1,16 @@
-# RONRIKU — Pitch v1
+# ODLET — Pitch v1
+
+> Renamed: RONRIKU is now **ODLET** (odlet.xyz), 26 September 2026. Product name updated below; the plan and findings are unchanged.
 
 > Written the way the team would naturally pitch it on launch morning: feature-first, lots of enthusiasm, not yet stress-tested. The roast (`02-roast.md`) takes this apart. The rewrite is `03-ideal-pitch.md`.
 
 ---
 
-## RONRIKU: the pixel-art reasoning + action game for Solana Seeker
+## ODLET: the pixel-art reasoning + action game for Solana Seeker
 
 **Train your brain. Fight monsters. Own your hero.**
 
-RONRIKU is a pixel-art game where your mind is the weapon. Walk a voxel hero across **5 worlds × 12 levels** and beat guardian monsters with fast micro-puzzles, Balatro-style rune card fights, ice-slide puzzles and a rhythm dungeon. Then come back every day for the **3-trial Daily brain challenge**, climb the **reasoning rating** leaderboard, raid **weekly bosses**, and collect **MagicaVoxel-style voxel figures** you really own as **Metaplex Core NFTs** on Solana.
+Odlet is a pixel-art game where your mind is the weapon. Walk a voxel hero across **5 worlds × 12 levels** and beat guardian monsters with fast micro-puzzles, Balatro-style rune card fights, ice-slide puzzles and a rhythm dungeon. Then come back every day for the **3-trial Daily brain challenge**, climb the **reasoning rating** leaderboard, raid **weekly bosses**, and collect **MagicaVoxel-style voxel figures** you really own as **Metaplex Core NFTs** on Solana.
 
 Launching today on the **Solana dApp Store for Seeker**, and playable in any browser at the same time.
 
@@ -53,6 +55,6 @@ Unity 6 (Android + WebGL) · Supabase (Postgres, RLS, RPCs) · a TypeScript port
 
 ### The ask
 
-Download RONRIKU on the Solana dApp Store, play the Daily, and tell your friends. We're looking for community, partners and early supporters to help us grow the best brain game on Solana.
+Download Odlet on the Solana dApp Store, play the Daily, and tell your friends. We're looking for community, partners and early supporters to help us grow the best brain game on Solana.
 
-**RONRIKU: three tests, one mind.**
+**ODLET: three tests, one mind.**

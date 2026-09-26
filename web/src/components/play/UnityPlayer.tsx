@@ -41,8 +41,8 @@ export function UnityPlayer({ build }: { build: UnityBuildFiles | null }) {
 function UnityFrame({ build }: { build: UnityBuildFiles }) {
   const { unityProvider, isLoaded, loadingProgression, initialisationError, requestFullscreen } = useUnityContext({
     ...build,
-    companyName: "RONRIKU",
-    productName: "RONRIKU",
+    companyName: "ODLET",
+    productName: "ODLET",
     productVersion: "2",
     // Unity 6 WebGL: flush persistentDataPath (profile.json) to IndexedDB so progress survives reloads.
     autoSyncPersistentDataPath: true,
@@ -72,7 +72,7 @@ function UnityFrame({ build }: { build: UnityBuildFiles }) {
               </>
             ) : (
               <>
-                <p className="font-pixel text-[24px] text-teal">RONRIKU</p>
+                <p className="font-pixel text-[24px] text-teal">ODLET</p>
                 <PixelProgress value={loadingProgression} label="LOADING" />
                 <p className="px-blink font-pixel text-[10px] text-muted">BOOTING WEBGL…</p>
               </>

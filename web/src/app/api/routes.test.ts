@@ -182,7 +182,7 @@ describe("GET /api/figures/[id]/metadata", () => {
     const res = await call("demo-1-3");
     expect(res.status).toBe(200);
     const json = await res.json();
-    expect(json.symbol).toBe("RNRK");
+    expect(json.symbol).toBe("ODLET");
     expect(json.image).toMatch(/\/api\/figures\/demo-1-3\/image$/);
     const traits = Object.fromEntries((json.attributes as { trait_type: string; value: unknown }[]).map((a) => [a.trait_type, a.value]));
     expect(traits.Tier).toBe("3x3");

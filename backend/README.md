@@ -1,4 +1,4 @@
-# RONRIKU backend (local Supabase)
+# Odlet backend (local Supabase)
 
 The backend is a Supabase CLI project in `supabase/`, set up per `docs/PLAN_V2.md` §7:
 
@@ -118,7 +118,7 @@ So misreporting can only make a score worse than honest play. Elapsed times are 
 ## wallet-link edge function
 
 1. `POST /functions/v1/wallet-link {action:"nonce"}` with the user JWT returns `{nonce, expires_at, message}`.
-2. Sign the UTF-8 bytes of `message` verbatim. It is SIWS-style: `{domain} wants you to link your Solana wallet to RONRIKU.` followed by User, Nonce and Expires lines. The domain comes from `WALLET_LINK_DOMAIN` (default `ronriku.local`). The format is in `functions/_shared/wallet-message.ts`.
+2. Sign the UTF-8 bytes of `message` verbatim. It is SIWS-style: `{domain} wants you to link your Solana wallet to Odlet.` followed by User, Nonce and Expires lines. The domain comes from `WALLET_LINK_DOMAIN` (default `odlet.xyz`). The format is in `functions/_shared/wallet-message.ts`.
 3. `POST {action:"verify", address:<base58 pubkey>, signature:<base58 64 bytes>}` returns `{wallet_address}`. The ed25519 check uses tweetnacl. Nonces live 5 minutes and are single-use: they are consumed by an atomic `DELETE … RETURNING`, and a request that deletes 0 rows fails with 404. Errors: 409 `wallet_in_use`, 422 `bad_signature`, 404 `no_nonce`, 410 `nonce_expired`.
 
 ## Not done yet

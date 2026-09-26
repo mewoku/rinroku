@@ -15,7 +15,7 @@ namespace Ronriku.Presentation.Components
         public static string DailyText(DailyResult result, int day, string url)
         {
             var sb = new StringBuilder();
-            sb.Append("RONRIKU Daily #").Append(day.ToString("000")).Append(' ');
+            sb.Append("ODLET Daily #").Append(day.ToString("000")).Append(' ');
             IReadOnlyList<TrialOutcome> outcomes = result.Outcomes;
             if (outcomes != null)
                 foreach (TrialOutcome o in outcomes)
@@ -41,7 +41,7 @@ namespace Ronriku.Presentation.Components
                 intent.Call<AndroidJavaObject>("putExtra", intentClass.GetStatic<string>("EXTRA_TEXT"), text);
                 using var player = new AndroidJavaClass("com.unity3d.player.UnityPlayer");
                 using var activity = player.GetStatic<AndroidJavaObject>("currentActivity");
-                using var chooser = intentClass.CallStatic<AndroidJavaObject>("createChooser", intent, "Share RONRIKU");
+                using var chooser = intentClass.CallStatic<AndroidJavaObject>("createChooser", intent, "Share ODLET");
                 activity.Call("startActivity", chooser);
                 return true;
             }

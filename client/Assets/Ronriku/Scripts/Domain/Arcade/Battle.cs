@@ -62,6 +62,9 @@ namespace Ronriku.Domain.Arcade
         /// <summary>Combo at which cards turn HARD (one tier up, +5 base chips).</summary>
         public const int HeatCombo = 3;
         public const int HardBonus = 5;
+        /// <summary>Every Nth card is a BIG CARD: a full classic trial (Pattern / Shadow / Link).</summary>
+        public const int BigCardEvery = 4;
+        public const int BigCardChips = 30;
 
         private readonly List<(int answer, int ms)> _log = new List<(int, int)>();
         private readonly List<int> _swingsAt = new List<int>();
@@ -100,6 +103,11 @@ namespace Ronriku.Domain.Arcade
             int pick = rng.NextInt(pool.Length);
             if (pool.Length > 1 && pick == _lastKind) pick = (pick + 1 + rng.NextInt(pool.Length - 1)) % pool.Length;
             _lastKind = pick;
+            if (index % BigCardEvery == BigCardEvery - 1)
+            {
+                CurrentHard = false;
+                return Challenges.Generate(ChallengeKind.Classic, DailyPlan.Mix(Config.Seed, 1000 + index), Config.Tier);
+            }
             CurrentHard = Combo >= HeatCombo;
             int tier = CurrentHard ? 1 : Config.Tier;
             return Challenges.Generate(pool[pick], DailyPlan.Mix(Config.Seed, 1000 + index), tier);
@@ -117,11 +125,12 @@ namespace Ronriku.Domain.Arcade
             if (Over) throw new InvalidOperationException("battle over");
             _log.Add((answer, thinkMs));
             bool correct = Challenges.IsCorrect(Current, answer);
+            bool big = Current.Kind == ChallengeKind.Classic;
             HitResult result;
             if (correct)
             {
                 int speed = SpeedBonus(thinkMs);
-                int baseChips = BaseChips + (CurrentHard ? HardBonus : 0);
+                int baseChips = big ? BigCardChips : BaseChips + (CurrentHard ? HardBonus : 0);
                 int chips = baseChips + speed;
                 int mult = Math.Min(MaxMult, 1 + Combo);
                 int damage = chips * mult;
@@ -132,8 +141,9 @@ namespace Ronriku.Domain.Arcade
             }
             else
             {
+                // A missed BIG CARD only breaks the combo; small cards also cost a heart.
                 Combo = 0;
-                Hearts--;
+                if (!big) Hearts--;
                 result = new HitResult(false, 0, 0, 0, 0, 0);
             }
             Index++;

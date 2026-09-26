@@ -16,6 +16,9 @@ namespace Ronriku.Presentation.Accessibility
         private static AudioSource _source;
         private static readonly Dictionary<Sfx, AudioClip> Clips = new Dictionary<Sfx, AudioClip>();
 
+        /// <summary>The platform haptics service (null before Init).</summary>
+        public static IHapticsService Haptics => _haptics;
+
         public static bool SoundEnabled
         {
             get => PlayerPrefs.GetInt(SoundKey, 1) == 1;

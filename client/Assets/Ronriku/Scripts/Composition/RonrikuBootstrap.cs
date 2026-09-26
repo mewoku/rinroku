@@ -56,6 +56,8 @@ namespace Ronriku.Composition
             Screen.orientation = ScreenOrientation.Portrait;
             _analytics = new LocalAnalyticsService();
             _haptics = new PlatformHapticsService { Enabled = PlayerPrefs.GetInt("ronriku.haptics", 1) == 1 };
+            // Without an AudioListener Unity plays nothing at all (music and SFX were silent on device).
+            if (FindAnyObjectByType<AudioListener>() == null) gameObject.AddComponent<AudioListener>();
             Feedback.Init(gameObject, _haptics);
             Music.Init(gameObject);
             Music.Play(MusicTrack.Menu);
@@ -630,11 +632,11 @@ namespace Ronriku.Composition
             style.backgroundColor = RonrikuTheme.Background;
             style.alignItems = Align.Center;
             style.justifyContent = Justify.Center;
-            var logo = new PixelLabel("RONRIKU", RonrikuTheme.Teal, 7);
+            var logo = new PixelLabel("ODLET", RonrikuTheme.Teal, 8);
             logo.style.height = 60;
             logo.style.width = Length.Percent(100);
             Add(logo);
-            var tag = UiFactory.Heading("THREE TESTS. ONE MIND.", 11, RonrikuTheme.Muted);
+            var tag = UiFactory.Heading("SOLVE TO STRIKE.", 11, RonrikuTheme.Muted);
             Add(tag);
             float start = Time.realtimeSinceStartup;
             schedule.Execute(() =>

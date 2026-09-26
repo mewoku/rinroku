@@ -41,6 +41,7 @@ namespace Ronriku.Presentation.Arcade
         private bool _active;
         private bool _finished;
         private int _totalDamage;
+        private bool _bigCard;
         private ArcadeResult _result;
         private bool _reported;
 
@@ -155,7 +156,16 @@ namespace Ronriku.Presentation.Arcade
                 }
             };
             _cardSlot.Add(_view);
-            if (_state.Combo >= BattleState.HeatCombo)
+            bool big = _state.Current.Kind == ChallengeKind.Classic;
+            _arena.style.display = big ? DisplayStyle.None : DisplayStyle.Flex;
+            _swingFill.parent.style.display = big ? DisplayStyle.None : DisplayStyle.Flex;
+            _bigCard = big;
+            if (big)
+            {
+                Juice.Banner(_overlay, "BIG CARD!", RonrikuTheme.Gold, 0.8f);
+                Feedback.Whoosh();
+            }
+            if (!big && _state.Combo >= BattleState.HeatCombo)
             {
                 var hot = UiFactory.Heading("HOT STREAK  +5 CHIPS", 10, RonrikuTheme.Gold);
                 hot.name = "hot-badge";
@@ -178,7 +188,8 @@ namespace Ronriku.Presentation.Arcade
             // Clamp: after an app pause the realtime clock jumps; never let that land a swing.
             float dt = Mathf.Min((now - _lastTick) * 1000f, 100f);
             _lastTick = now;
-            if (!_active || _finished || _showingSince >= 0) return;
+            // The monster waits while you work a BIG CARD (they take real thought).
+            if (!_active || _finished || _showingSince >= 0 || _bigCard) return;
             _swingMs += dt;
             float t = Mathf.Clamp01(_swingMs / _state.Config.AttackMs);
             _swingFill.style.width = Length.Percent(t * 100f);
@@ -209,7 +220,13 @@ namespace Ronriku.Presentation.Arcade
             _active = false;
             float thinkMs = (Time.realtimeSinceStartup - _challengeStart) * 1000f - _shownMs;
             HitResult hit = _state.Answer(answer, Mathf.Max(0, Mathf.RoundToInt(thinkMs)));
-            _view.Reveal(hit.Correct, answer);
+            if (_bigCard)
+            {
+                _arena.style.display = DisplayStyle.Flex;
+                _swingFill.parent.style.display = DisplayStyle.Flex;
+                _bigCard = false;
+            }
+            else _view.Reveal(hit.Correct, answer);
             if (hit.Correct) Strike(hit);
             else Miss();
             schedule.Execute(() =>

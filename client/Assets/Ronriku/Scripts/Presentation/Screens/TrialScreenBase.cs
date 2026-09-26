@@ -23,6 +23,11 @@ namespace Ronriku.Presentation.Screens
         /// <summary>HP segments for boss fights (stages); 1 for normal levels.</summary>
         public int HpSegments = 1;
         public int HpRemaining = 1;
+        /// <summary>
+        /// Embedded in a battle as a BIG CARD: no top bar/footer, compact title, and it reports itself
+        /// done shortly after solving (no CONTINUE tap).
+        /// </summary>
+        public bool Embedded;
     }
 
     /// <summary>
@@ -62,8 +67,8 @@ namespace Ronriku.Presentation.Screens
             _startedAt = Time.realtimeSinceStartup;
 
             style.flexGrow = 1;
-            style.paddingLeft = style.paddingRight = RonrikuTheme.Gutter;
-            style.paddingTop = 8;
+            style.paddingLeft = style.paddingRight = context.Embedded ? 4 : RonrikuTheme.Gutter;
+            style.paddingTop = context.Embedded ? 0 : 8;
             style.paddingBottom = 12;
 
             var top = UiFactory.Row();
@@ -85,7 +90,7 @@ namespace Ronriku.Presentation.Screens
             header.style.whiteSpace = WhiteSpace.Normal;
             top.Add(header);
 
-            if (context.Monster != null)
+            if (context.Monster != null && !context.Embedded)
             {
                 var guardian = new VisualElement();
                 guardian.style.alignItems = Align.Center;
@@ -108,10 +113,10 @@ namespace Ronriku.Presentation.Screens
                 guardian.Add(_hpBar);
                 top.Add(guardian);
             }
-            Add(top);
+            if (!context.Embedded) Add(top);
 
-            var titleLabel = new PixelLabel(title, Palette.Accent, 5);
-            titleLabel.style.height = 44;
+            var titleLabel = new PixelLabel(title, Palette.Accent, context.Embedded ? 3 : 5);
+            titleLabel.style.height = context.Embedded ? 26 : 44;
             titleLabel.style.flexShrink = 0;
             Add(titleLabel);
             var instructionLabel = UiFactory.Heading(instruction, 10, RonrikuTheme.Text);
@@ -150,7 +155,7 @@ namespace Ronriku.Presentation.Screens
             var footer = UiFactory.Label($"{context.Footer}  ·  {contentHash.Substring(0, Math.Min(8, contentHash.Length)).ToUpperInvariant()}", 9, RonrikuTheme.Muted);
             footer.style.height = 18;
             footer.style.flexShrink = 0;
-            Add(footer);
+            if (!context.Embedded) Add(footer);
 
             _clock = schedule.Execute(Tick).Every(250);
         }
@@ -187,7 +192,8 @@ namespace Ronriku.Presentation.Screens
             Controls.SetEnabled(false);
             Controls.style.opacity = 0.35f;
             Continue.text = "CONTINUE";
-            Continue.style.visibility = Visibility.Visible;
+            Continue.style.visibility = _context.Embedded ? Visibility.Hidden : Visibility.Visible;
+            if (_context.Embedded) schedule.Execute(Finish).StartingIn(solved ? 650 : 1100);
             if (solved)
             {
                 Feedback.Success();
@@ -235,8 +241,12 @@ namespace Ronriku.Presentation.Screens
             Continue.style.visibility = Visibility.Visible;
         }
 
+        private bool _finished;
+
         private void Finish()
         {
+            if (_finished) return;
+            _finished = true;
             _clock.Pause();
             _completed?.Invoke(CreateOutcome(Solved, ElapsedMilliseconds));
         }

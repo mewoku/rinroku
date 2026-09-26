@@ -16,7 +16,8 @@ namespace Ronriku.Domain.Arcade
         Memory = 3,  // lights flash, tap them back
         Mirror = 4,  // pick the half that completes the mirror picture
         Arrows = 5,  // follow the arrows: where does the ball leave the board?
-        Scales = 6   // balance scales: how many small weights equal the question
+        Scales = 6,  // balance scales: how many small weights equal the question
+        Classic = 7  // BIG CARD: a full classic trial (Items[0]: 0 Pattern, 1 Shadow, 2 Link); Answer 1 = solved
     }
 
     /// <summary>
@@ -79,6 +80,7 @@ namespace Ronriku.Domain.Arcade
             ChallengeKind.Memory => "REMEMBER THE LIGHTS",
             ChallengeKind.Mirror => "COMPLETE THE MIRROR",
             ChallengeKind.Arrows => "WHERE DOES THE BALL EXIT?",
+            ChallengeKind.Classic => Items[0] == 0 ? "BIG CARD · PATTERN" : Items[0] == 1 ? "BIG CARD · SHADOW" : "BIG CARD · LINK",
             _ => "HOW MANY DOTS?"
         };
     }
@@ -118,6 +120,7 @@ namespace Ronriku.Domain.Arcade
                 ChallengeKind.Memory => Memory(ref rng, seed, tier),
                 ChallengeKind.Mirror => Mirror(ref rng, seed, tier),
                 ChallengeKind.Arrows => Arrows(ref rng, seed, tier),
+                ChallengeKind.Classic => new Challenge(ChallengeKind.Classic, seed, tier, new[] { rng.NextInt(3) }, Array.Empty<int>(), 1),
                 _ => Scales(ref rng, seed, tier)
             };
         }

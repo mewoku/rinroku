@@ -86,6 +86,9 @@ namespace Ronriku.Tests
                     for (int i = 0; i < 16; i++)
                         if ((c.Answer & (1 << i)) != 0) Click(view.Q<Button>($"cell-{i}"));
                     break;
+                case ChallengeKind.Classic:
+                    yield return BigCardSolver.Solve(view);
+                    break;
                 default:
                     Click(view.Q<Button>($"option-{c.Answer}"));
                     break;
@@ -128,6 +131,18 @@ namespace Ronriku.Tests
             Click(root.Q<Button>("result-continue"));
             yield return null;
             Assert.That(root.Q("play-map"), Is.Not.Null);
+        }
+
+        [UnityTest]
+        public IEnumerator Audio_HasOneListener_AndMusicStarts()
+        {
+            RonrikuBootstrap app = null;
+            yield return Load(a => app = a);
+            Assert.That(UnityEngine.Object.FindObjectsByType<AudioListener>(FindObjectsSortMode.None).Length, Is.EqualTo(1),
+                "exactly one AudioListener, or Unity is silent");
+            yield return WaitFor(() => Ronriku.Presentation.Audio.Music.IsPlaying, 10f, "menu music audible");
+            PlayLevel(app, 0, 5);
+            yield return WaitFor(() => Ronriku.Presentation.Audio.Music.IsPlaying && Ronriku.Presentation.Audio.Music.Current == Ronriku.Presentation.Audio.MusicTrack.HeroRun, 12f, "hero run music");
         }
 
         [UnityTest]

@@ -19,7 +19,7 @@ namespace Ronriku.Presentation
 
         [Header("Sharing")]
         [Tooltip("Link appended to shared Daily results (your website / store page). Empty = no link.")]
-        public string shareUrl = "";
+        public string shareUrl = "https://odlet.xyz";
 
         [Header("Audio")]
         [Tooltip("Sound-effect loudness (music has its own slider in the Me tab).")]

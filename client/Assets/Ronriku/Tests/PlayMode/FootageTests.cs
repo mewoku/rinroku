@@ -148,6 +148,7 @@ namespace Ronriku.Tests
                     for (int i = 0; i < 16; i++)
                         if ((c.Answer & (1 << i)) != 0) { DailyRouteTests.Click(view.Q<Button>($"cell-{i}")); yield return new WaitForSecondsRealtime(0.15f); }
                 }
+                else if (c.Kind == ChallengeKind.Classic) yield return BigCardSolver.Solve(view);
                 else DailyRouteTests.Click(view.Q<Button>($"option-{c.Answer}"));
                 float wait = Time.realtimeSinceStartup + 4f;
                 while (battle.State.Index == index && !battle.State.Over && Time.realtimeSinceStartup < wait) yield return null;

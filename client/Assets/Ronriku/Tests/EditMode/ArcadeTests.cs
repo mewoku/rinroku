@@ -15,6 +15,8 @@ namespace Ronriku.Tests
         public void Challenges_AreDeterministic_AndHaveExactlyOneRightAnswer()
         {
             foreach (ChallengeKind kind in Kinds)
+            {
+            if (kind == ChallengeKind.Classic) continue;
             for (int tier = 0; tier < 2; tier++)
             for (long seed = 1; seed <= 300; seed++)
             {
@@ -56,6 +58,7 @@ namespace Ronriku.Tests
                         Assert.That(c.Answer, Is.InRange(0, c.Options.Length - 1), where);
                         break;
                 }
+            }
             }
         }
 
@@ -368,6 +371,10 @@ namespace Ronriku.Tests
                 Assert.That(b.CurrentHard, Is.False);
                 b.Answer(b.Current.Answer, BattleState.SlowMs);
             }
+            // Card 4 is a BIG CARD (classic trial, x3 chips), then the streak turns cards HARD.
+            Assert.That(b.Current.Kind, Is.EqualTo(ChallengeKind.Classic));
+            HitResult big = b.Answer(1, BattleState.SlowMs);
+            Assert.That(big.Chips, Is.EqualTo(BattleState.BigCardChips));
             Assert.That(b.CurrentHard, Is.True);
             Assert.That(b.Current.Tier, Is.EqualTo(1));
             HitResult hit = b.Answer(b.Current.Answer, BattleState.SlowMs);

@@ -138,6 +138,7 @@ namespace Ronriku.Tests
                 {
                     for (int i = 0; i < c.Items.Length; i++) if ((c.Answer & (1 << i)) != 0) DailyRouteTests.Click(root.Q<Button>($"tile-{i}"));
                 }
+                else if (c.Kind == Ronriku.Domain.Arcade.ChallengeKind.Classic) yield return BigCardSolver.Solve(root.Q<Ronriku.Presentation.Arcade.ChallengeView>());
                 else if (c.Kind != Ronriku.Domain.Arcade.ChallengeKind.Memory) DailyRouteTests.Click(root.Q<Button>($"option-{c.Answer}"));
                 yield return new WaitForSecondsRealtime(0.45f);
                 yield return Settle();

@@ -44,6 +44,12 @@ namespace Ronriku.Presentation.Arcade
             style.paddingBottom = 12;
             style.alignItems = Align.Stretch;
 
+            if (challenge.Kind == ChallengeKind.Classic)
+            {
+                BuildClassic();
+                return;
+            }
+
             var prompt = UiFactory.Heading(challenge.Prompt, 15, palette.Accent);
             prompt.name = "prompt";
             prompt.style.height = 30;
@@ -131,6 +137,50 @@ namespace Ronriku.Presentation.Arcade
             row.style.flexWrap = Wrap.Wrap;
             row.style.justifyContent = Justify.Center;
             return row;
+        }
+
+        // ------------------------------------------------------------------ Classic (BIG CARD)
+
+        /// <summary>A full classic trial (Pattern / Shadow / Link) embedded in the card. Answer 1 = solved.</summary>
+        private void BuildClassic()
+        {
+            style.paddingLeft = style.paddingRight = 2;
+            style.paddingTop = 2;
+            UiFactory.SetBorder(this, 3, RonrikuTheme.Gold);
+            var difficulty = _challenge.Tier > 0 ? Ronriku.Domain.Puzzles.PuzzleDifficulty.Standard : Ronriku.Domain.Puzzles.PuzzleDifficulty.Easy;
+            var context = new Screens.TrialScreenContext
+            {
+                Haptics = Feedback.Haptics ?? new SilentHaptics(),
+                Back = () => { },
+                Completed = outcome => Submit(outcome.Solved ? 1 : 0),
+                Header = _challenge.Prompt,
+                Footer = string.Empty,
+                Palette = _palette,
+                Embedded = true
+            };
+            VisualElement trial = _challenge.Items[0] switch
+            {
+                0 => new Screens.PatternPuzzleScreen(new Ronriku.Domain.Puzzles.PatternPuzzleGenerator().Generate(_challenge.Seed, difficulty, 0), context),
+                1 => new Screens.SpatialPuzzleScreen(new Ronriku.Domain.Puzzles.SpatialPuzzleGenerator().Generate(_challenge.Seed, difficulty, 0), context),
+                _ => new Screens.LogicPuzzleScreen(new Ronriku.Domain.Puzzles.LogicPuzzleGenerator().Generate(_challenge.Seed, difficulty, 0), context)
+            };
+            trial.name = "big-card";
+            trial.style.flexGrow = 1;
+            Add(trial);
+            var badge = UiFactory.Heading("BIG CARD  X3 CHIPS", 10, RonrikuTheme.Gold);
+            badge.style.position = Position.Absolute;
+            badge.style.top = 4;
+            badge.style.right = 8;
+            badge.pickingMode = PickingMode.Ignore;
+            Add(badge);
+        }
+
+        private sealed class SilentHaptics : IHapticsService
+        {
+            public bool Enabled { get; set; }
+            public void Selection() { }
+            public void Success() { }
+            public void Error() { }
         }
 
         // ------------------------------------------------------------------ Next

@@ -28,10 +28,10 @@ namespace Ronriku.Editor
         }
 
         [MenuItem("RONRIKU/Build Android (Development)")]
-        public static void BuildAndroid() => Build("RONRIKU-dev.apk", BuildOptions.Development);
+        public static void BuildAndroid() => Build("ODLET-dev.apk", BuildOptions.Development);
 
         [MenuItem("RONRIKU/Build Android (Release)")]
-        public static void BuildAndroidRelease() => Build("RONRIKU.apk", BuildOptions.None);
+        public static void BuildAndroidRelease() => Build("ODLET.apk", BuildOptions.None);
 
         /// <summary>
         /// Browser build embedded by the website (web/public/unity/Build/unity.*). Gzip with the
@@ -104,9 +104,9 @@ namespace Ronriku.Editor
 
         private static void ConfigureProject()
         {
-            PlayerSettings.companyName = "RONRIKU";
-            PlayerSettings.productName = "RONRIKU";
-            PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Android, "com.ronriku.game");
+            PlayerSettings.companyName = "ODLET";
+            PlayerSettings.productName = "ODLET";
+            PlayerSettings.SetApplicationIdentifier(NamedBuildTarget.Android, "com.odlet.game");
             PlayerSettings.defaultInterfaceOrientation = UIOrientation.Portrait;
             PlayerSettings.allowedAutorotateToLandscapeLeft = false;
             PlayerSettings.allowedAutorotateToLandscapeRight = false;

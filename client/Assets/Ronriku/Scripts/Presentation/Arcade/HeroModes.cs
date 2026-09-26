@@ -213,8 +213,11 @@ namespace Ronriku.Presentation.Arcade
 
         public DashState State => _state;
 
-        public DashScreen(DashLevel level, Figure hero, Palette palette, string title, Action back, Action<ArcadeResult> completed)
+        private readonly int _heat;
+
+        public DashScreen(DashLevel level, Figure hero, Palette palette, string title, Action back, Action<ArcadeResult> completed, int heat = 0)
         {
+            _heat = heat;
             _state = new DashState(level);
             _palette = palette;
             _completed = completed;
@@ -326,7 +329,7 @@ namespace Ronriku.Presentation.Arcade
         private void Finish()
         {
             _finished = true;
-            var sb = new StringBuilder("D1:");
+            var sb = new StringBuilder("D1:h").Append(_heat).Append('|');
             foreach (int d in _state.Log) sb.Append(d < 0 ? 'r' : (char)('0' + d));
             var result = _result = new ArcadeResult
             {
@@ -433,8 +436,9 @@ namespace Ronriku.Presentation.Arcade
 
         public CrawlState State => _state;
 
-        public CrawlScreen(CrawlLevel level, Figure hero, Palette palette, string title, Action back, Action<ArcadeResult> completed, int beatsPerMove = 0)
+        public CrawlScreen(CrawlLevel level, Figure hero, Palette palette, string title, Action back, Action<ArcadeResult> completed, int beatsPerMove = 0, int heat = 0)
         {
+            _proof.Append('h').Append(heat).Append('|');
             _beatsPerMove = beatsPerMove;
             _state = new CrawlState(level);
             _palette = palette;

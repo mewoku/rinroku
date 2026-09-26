@@ -305,9 +305,11 @@ namespace Ronriku.Presentation.Arcade
 
         public static string Proof(BattleState state)
         {
-            var sb = new StringBuilder("B1:");
+            // B1:h<heat>|<answer>@<ms>,...|s<answerIndex>,...  — enough to replay the exact card sequence.
+            var sb = new StringBuilder("B1:h").Append(state.Config.Heat).Append('|');
             foreach (var (answer, ms) in state.Log) sb.Append(answer).Append('@').Append(ms).Append(',');
-            sb.Append("s").Append(state.MonsterSwings);
+            sb.Append('|');
+            foreach (int at in state.SwingsAt) sb.Append('s').Append(at).Append(',');
             return sb.ToString();
         }
     }

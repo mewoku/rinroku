@@ -298,7 +298,14 @@ PlayerSettings:
   AndroidAppBundleSizeToValidate: 200
   AndroidReportGooglePlayAppDependencies: 1
   androidSymbolsSizeThreshold: 800
-  m_BuildTargetIcons: []
+  m_BuildTargetIcons:
+  - m_BuildTarget: 
+    m_Icons:
+    - serializedVersion: 2
+      m_Icon: {fileID: 2800000, guid: f1f58078b514ffb4e899da8b6ede802b, type: 3}
+      m_Width: 128
+      m_Height: 128
+      m_Kind: 0
   m_BuildTargetPlatformIcons:
   - m_BuildTarget: iPhone
     m_Icons:
@@ -399,32 +406,44 @@ PlayerSettings:
       m_SubKind: App Store
   - m_BuildTarget: Android
     m_Icons:
-    - m_Textures: []
+    - m_Textures:
+      - {fileID: 2800000, guid: fc0257ade6032c644a0e02dfe2a32ed9, type: 3}
+      - {fileID: 2800000, guid: 4720d36a1e51ead47992ff6b97c5b26e, type: 3}
       m_Width: 432
       m_Height: 432
       m_Kind: 2
       m_SubKind: 
-    - m_Textures: []
+    - m_Textures:
+      - {fileID: 2800000, guid: 5d6b4be0eeb0e4f4c91ae4e3f12e29b8, type: 3}
+      - {fileID: 2800000, guid: b3e1e59f87687984d9660446658f1f80, type: 3}
       m_Width: 324
       m_Height: 324
       m_Kind: 2
       m_SubKind: 
-    - m_Textures: []
+    - m_Textures:
+      - {fileID: 2800000, guid: 488fde06d52162e48a1a57bb51a134e5, type: 3}
+      - {fileID: 2800000, guid: 6e746b29e92f9cb49825757d6e4a858e, type: 3}
       m_Width: 216
       m_Height: 216
       m_Kind: 2
       m_SubKind: 
-    - m_Textures: []
+    - m_Textures:
+      - {fileID: 2800000, guid: 393ffe23cdc32154b92f4da52396676f, type: 3}
+      - {fileID: 2800000, guid: 830d748f445f3c447aee6a56d8d12a52, type: 3}
       m_Width: 162
       m_Height: 162
       m_Kind: 2
       m_SubKind: 
-    - m_Textures: []
+    - m_Textures:
+      - {fileID: 2800000, guid: 95c6db2d9a17c4f45be2d1dd8b49dd5e, type: 3}
+      - {fileID: 2800000, guid: a398ca1f07f9f7c4a9444ca4a70bc51d, type: 3}
       m_Width: 108
       m_Height: 108
       m_Kind: 2
       m_SubKind: 
-    - m_Textures: []
+    - m_Textures:
+      - {fileID: 2800000, guid: 06d073e1c967aca4ab207ffb4d5b285d, type: 3}
+      - {fileID: 2800000, guid: a37721f8fdfbdd44dac417d63affd67c, type: 3}
       m_Width: 81
       m_Height: 81
       m_Kind: 2
@@ -834,7 +853,7 @@ PlayerSettings:
   hmiLoadingImage: {fileID: 0}
   platformRequiresReadableAssets: 0
   virtualTexturingSupportEnabled: 0
-  insecureHttpOption: 2
+  insecureHttpOption: 0
   androidVulkanDenyFilterList: []
   androidVulkanAllowFilterList: []
   androidVulkanDeviceFilterListAsset: {fileID: 0}

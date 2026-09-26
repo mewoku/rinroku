@@ -44,6 +44,8 @@ namespace Ronriku.Editor
             string output = Path.GetFullPath(Path.Combine(Application.dataPath, "../../web/public/unity"));
             if (Directory.Exists(output)) Directory.Delete(output, true);
             PlayerSettings.WebGL.compressionFormat = WebGLCompressionFormat.Gzip;
+            // Same-origin API calls follow the page scheme; the browser enforces mixed content itself.
+            PlayerSettings.insecureHttpOption = InsecureHttpOption.AlwaysAllowed;
             PlayerSettings.WebGL.decompressionFallback = true;
             PlayerSettings.WebGL.nameFilesAsHashes = false;
             PlayerSettings.WebGL.dataCaching = true;
@@ -80,7 +82,9 @@ namespace Ronriku.Editor
             // Development builds may talk to the adb-reversed http dev backend; store builds may not.
             PlayerSettings.insecureHttpOption = BackendIsCleartext((buildOptions & BuildOptions.Development) != 0)
                 ? InsecureHttpOption.AlwaysAllowed : InsecureHttpOption.NotAllowed;
-            RonrikuIcon.TryApply(logSuccess: false);
+            bool icons = RonrikuIcon.TryApply(logSuccess: false);
+            if (!icons && (buildOptions & BuildOptions.Development) == 0)
+                throw new BuildFailedException("Release build needs the app icons (RONRIKU/Apply Icons failed).");
             string output = Path.GetFullPath(Path.Combine(Application.dataPath, "../../Builds/Android", fileName));
             Directory.CreateDirectory(Path.GetDirectoryName(output) ?? throw new InvalidOperationException());
             // Always write a fresh file: in-place APK updates leave dead space between zip entries.

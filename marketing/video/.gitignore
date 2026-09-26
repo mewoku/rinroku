@@ -1,0 +1,11 @@
+node_modules/
+out/
+# Copied from the repo by scripts/prepare.mjs (regenerable)
+public/shots/
+public/audio/
+public/fonts/
+src/assets.generated.json
+# Recorded gameplay is large; share clips outside git (or remove this line to commit them)
+public/clips/*.mp4
+# Frame sequences written by the Unity Footage test (regenerable)
+public/clips/raw/

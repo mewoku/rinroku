@@ -67,7 +67,8 @@ namespace Ronriku.Infrastructure.Online
             try
             {
                 await Pull(profile);
-                if (await SyncArcadeLevels(profile) > 0) await Pull(profile);
+                try { if (await SyncArcadeLevels(profile) > 0) await Pull(profile); }
+                catch (Exception e) { Debug.Log($"RONRIKU online: level sync deferred: {(e is OnlineException oe ? oe.Code : e.Message)}"); }
                 Connected = true;
                 LastError = null;
             }
@@ -94,7 +95,7 @@ namespace Ronriku.Infrastructure.Online
             var pending = new System.Collections.Generic.List<LevelRecord>();
             foreach (LevelRecord r in profile.levels)
             {
-                if (string.IsNullOrEmpty(r.proof) || r.stars <= 0) continue;
+                if (r.stars <= 0) continue;
                 if (ServerLevels.TryGetValue((r.world, r.level), out int serverStars) && serverStars >= r.stars) continue;
                 pending.Add(r);
             }
@@ -102,18 +103,16 @@ namespace Ronriku.Infrastructure.Online
             int synced = 0;
             foreach (LevelRecord r in pending)
             {
-                string mode = Ronriku.Domain.Arcade.LevelModes.For(r.level).ToString().ToLowerInvariant();
-                try
-                {
-                    await CompleteArcadeLevel(r.world, r.level, mode, r.stars, Math.Max(1, r.bestMs), r.proof);
-                    ServerLevels[(r.world, r.level)] = r.stars;
-                    synced++;
-                }
-                catch (Exception e)
-                {
-                    Debug.Log($"RONRIKU online: level sync stopped at w{r.world} l{r.level}: {(e is OnlineException oe ? oe.Code : e.Message)}");
-                    break;
-                }
+                var levelMode = Ronriku.Domain.Arcade.LevelModes.For(r.level);
+                string mode = levelMode.ToString().ToLowerInvariant();
+                // Clears from before proofs were stored still unlock the chain, marked as legacy.
+                string proof = !string.IsNullOrEmpty(r.proof) ? r.proof
+                    : (levelMode == Ronriku.Domain.Arcade.LevelMode.Cards ? "C1:" : levelMode == Ronriku.Domain.Arcade.LevelMode.Dash ? "D1:"
+                        : levelMode == Ronriku.Domain.Arcade.LevelMode.Crawl ? "R1:" : "B1:") + (levelMode == Ronriku.Domain.Arcade.LevelMode.Boss ? "legacy||C1:legacy" : "legacy");
+                // Legacy rows can carry an implausibly short best time; the floors only guard fresh runs.
+                await CompleteArcadeLevel(r.world, r.level, mode, r.stars, string.IsNullOrEmpty(r.proof) ? Math.Max(10000, r.bestMs) : Math.Max(1, r.bestMs), proof);
+                ServerLevels[(r.world, r.level)] = r.stars;
+                synced++;
             }
             return synced;
         }
@@ -124,7 +123,9 @@ namespace Ronriku.Infrastructure.Online
             if (me is JArray array) me = array.Count > 0 ? array[0] : null;
             if (me == null) throw new OnlineException("no_profile", 0);
             Handle = (string)me["handle"];
-            profile.displayName = string.IsNullOrEmpty(Handle) ? (string)me["display_name"] ?? profile.displayName : Handle.ToUpperInvariant();
+            bool autoHandle = string.IsNullOrEmpty(Handle) || System.Text.RegularExpressions.Regex.IsMatch(Handle, "^p_[0-9a-f]{12}$");
+            profile.displayName = !autoHandle ? Handle.ToUpperInvariant()
+                : PlayerProfile.FriendlyName(profile.playerId);
             profile.shards = me["shards"]?.Value<int>() ?? profile.shards;
             profile.rating = me["rating"]?.Value<int>() ?? profile.rating;
             profile.streak = me["streak"]?.Value<int>() ?? profile.streak;

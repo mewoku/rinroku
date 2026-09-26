@@ -13,6 +13,8 @@ namespace Ronriku.Domain.Arcade
         public int Hearts = 3;
         public int Tier;
         public ChallengeKind[] Pool;
+        /// <summary>Adaptive heat this config was built with (recorded in proofs for replay).</summary>
+        public int Heat;
 
         /// <summary>World pools grow one kind per world so each world teaches something new.</summary>
         public static ChallengeKind[] PoolFor(int world)
@@ -62,6 +64,9 @@ namespace Ronriku.Domain.Arcade
         public const int HardBonus = 5;
 
         private readonly List<(int answer, int ms)> _log = new List<(int, int)>();
+        private readonly List<int> _swingsAt = new List<int>();
+        /// <summary>Answer index at which each monster swing landed (cards depend on the combo, so replay needs this).</summary>
+        public IReadOnlyList<int> SwingsAt => _swingsAt;
         private int _lastKind = -1;
 
         public BattleConfig Config { get; }
@@ -95,7 +100,7 @@ namespace Ronriku.Domain.Arcade
             int pick = rng.NextInt(pool.Length);
             if (pool.Length > 1 && pick == _lastKind) pick = (pick + 1 + rng.NextInt(pool.Length - 1)) % pool.Length;
             _lastKind = pick;
-            CurrentHard = Config.Tier == 0 && Combo >= HeatCombo;
+            CurrentHard = Combo >= HeatCombo;
             int tier = CurrentHard ? 1 : Config.Tier;
             return Challenges.Generate(pool[pick], DailyPlan.Mix(Config.Seed, 1000 + index), tier);
         }
@@ -116,7 +121,7 @@ namespace Ronriku.Domain.Arcade
             if (correct)
             {
                 int speed = SpeedBonus(thinkMs);
-                int baseChips = BaseChips + (CurrentHard || (Config.Tier > 0 && Combo >= HeatCombo) ? HardBonus : 0);
+                int baseChips = BaseChips + (CurrentHard ? HardBonus : 0);
                 int chips = baseChips + speed;
                 int mult = Math.Min(MaxMult, 1 + Combo);
                 int damage = chips * mult;
@@ -141,10 +146,36 @@ namespace Ronriku.Domain.Arcade
         {
             if (Over) return;
             MonsterSwings++;
+            _swingsAt.Add(Index);
             Hearts--;
             Combo = 0;
         }
 
         public int Stars => Won ? Math.Max(1, Math.Min(3, Hearts)) : 0;
+
+        /// <summary>
+        /// Rebuilds a battle from its proof ("B1:h&lt;heat&gt;|a@ms,...|s&lt;index&gt;,...") so a verifier can check
+        /// the stars without trusting the client. Swings are applied just before the answer at their index.
+        /// </summary>
+        public static BattleState Replay(BattleConfig config, string proof)
+        {
+            var state = new BattleState(config);
+            string[] parts = proof.Substring(3).Split('|');
+            var swings = new List<int>();
+            if (parts.Length > 2)
+                foreach (string s in parts[2].Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries))
+                    swings.Add(int.Parse(s.Substring(1)));
+            int next = 0;
+            foreach (string entry in parts[1].Split(new[] { ',' }, StringSplitOptions.RemoveEmptyEntries))
+            {
+                while (next < swings.Count && swings[next] <= state.Index) { state.MonsterSwing(); next++; }
+                if (state.Over) break;
+                string[] am = entry.Split('@');
+                state.Answer(int.Parse(am[0]), int.Parse(am[1]));
+                if (state.Over) break;
+            }
+            while (next < swings.Count && !state.Over) { state.MonsterSwing(); next++; }
+            return state;
+        }
     }
 }

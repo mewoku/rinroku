@@ -68,6 +68,7 @@ namespace Ronriku.Composition
             if (RuntimeConfig.OnlineEnabled)
             {
                 _online = OnlineService.CreateFromConfig();
+                RuntimeConfig.OnlineAvailable = _online != null;
                 if (_online != null) ConnectOnline();
             }
         }
@@ -163,7 +164,7 @@ namespace Ronriku.Composition
             Shards = _profile.shards,
             Avatar = ShopCatalogue.Build(_profile.Avatar),
             AvatarKey = _profile.Avatar?.id,
-            Online = RuntimeConfig.Competitive
+            Online = RuntimeConfig.Competitive || !RuntimeConfig.OnlineAvailable
         };
 
         // ---------------------------------------------------------------- tabs
@@ -200,7 +201,7 @@ namespace Ronriku.Composition
                 DailyNumber = today,
                 Streak = _profile.DisplayStreak(today),
                 CompletedToday = _profile.HasCompleted(today),
-                LocalMode = !RuntimeConfig.Competitive,
+                LocalMode = RuntimeConfig.OnlineAvailable && !RuntimeConfig.Competitive,
                 PreviewCubes = preview.Cubes,
                 PreviewOrientation = preview.StartOrientation,
                 UntilReset = () => DailyCalendar.UntilReset(RuntimeConfig.UtcNow),
@@ -337,7 +338,7 @@ namespace Ronriku.Composition
             _analytics.Track("daily_completed", props);
             _analytics.Track("results_viewed", DailyProps(_session.Plan));
             ClearCurrent();
-            _shell.ShowFullscreen(new DailyResultsScreen(result, _session.Plan.Day, !RuntimeConfig.Competitive, _haptics,
+            _shell.ShowFullscreen(new DailyResultsScreen(result, _session.Plan.Day, RuntimeConfig.OnlineAvailable && !RuntimeConfig.Competitive, _haptics,
                 () => _shell.ShowTab(AppTab.Daily)), RonrikuTheme.Frost);
         }
 
@@ -388,11 +389,11 @@ namespace Ronriku.Composition
                         monster, $"HP {preview.Target}  ·  {preview.Hands} HANDS  ·  {preview.Discards} DISCARDS"), palette);
                     break;
                 case LevelMode.Dash:
-                    _shell.ShowFullscreen(new DashScreen(DashLevel.Generate(Ronriku.Domain.Daily.DailyPlan.Mix(def.Seed, 33), Adaptive.TierFor(LevelModes.Tier(world, index), heat)), hero, palette, title, BackToMap, done), palette);
+                    _shell.ShowFullscreen(new DashScreen(DashLevel.Generate(Ronriku.Domain.Daily.DailyPlan.Mix(def.Seed, 33), Adaptive.TierFor(LevelModes.Tier(world, index), heat)), hero, palette, title, BackToMap, done, heat), palette);
                     break;
                 case LevelMode.Crawl:
                     _shell.ShowFullscreen(new CrawlScreen(CrawlLevel.Generate(Ronriku.Domain.Daily.DailyPlan.Mix(def.Seed, 44), Adaptive.TierFor(LevelModes.Tier(world, index), heat)), hero, palette, title, BackToMap, done,
-                        Adaptive.CrawlBeatsPerMove(RonrikuTuning.Current.musicBeatsPerMove, heat)), palette);
+                        Adaptive.CrawlBeatsPerMove(RonrikuTuning.Current.musicBeatsPerMove, heat), heat), palette);
                     break;
                 default:
                     // Boss: phase 1 battle, phase 2 rune hand with two charms. Stars = the weaker phase.

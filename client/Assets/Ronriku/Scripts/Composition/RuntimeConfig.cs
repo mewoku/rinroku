@@ -14,6 +14,9 @@ namespace Ronriku.Composition
         /// <summary>True while connected to the backend; results are then server-validated and ranked.</summary>
         public static bool Competitive { get; set; }
 
+        /// <summary>True when this build has a backend configured at all (store builds may ship offline-only).</summary>
+        public static bool OnlineAvailable { get; set; }
+
         public static string Environment => Competitive ? "online" : "local";
 
         /// <summary>Profile storage directory. Null means <c>Application.persistentDataPath</c>.</summary>
@@ -31,6 +34,7 @@ namespace Ronriku.Composition
         {
             OnlineEnabled = true;
             Competitive = false;
+            OnlineAvailable = false;
             ProfileDirectory = null;
             UtcNowOverride = null;
             SkipHowTo = false;

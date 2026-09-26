@@ -124,7 +124,7 @@ namespace Ronriku.Presentation.Screens
             Add(go);
             if (retry != null)
             {
-                var again = UiFactory.FlatButton(model.Won ? "REPLAY FOR STARS" : "TRY AGAIN", retry);
+                var again = UiFactory.FlatButton(!model.Won ? "TRY AGAIN" : model.Stars >= 3 ? "PLAY AGAIN" : "REPLAY FOR STARS", retry);
                 again.name = "result-retry";
                 again.style.marginTop = 10;
                 Add(again);

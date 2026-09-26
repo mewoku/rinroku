@@ -138,8 +138,25 @@ namespace Ronriku.Domain.Player
         }
 
         /// <summary>A figure-style name (e.g. "KEYOVI") derived from the player id, so nobody starts as "PLAYER 1A2B".</summary>
-        public static string FriendlyName(string playerId) =>
-            Figures.FigureGenerator.Generate(Hashing.Fnv1a(playerId ?? "ronriku"), 3, false).Name;
+        public static string FriendlyName(string playerId)
+        {
+            ulong seed = Hashing.Fnv1a(playerId ?? "ronriku");
+            for (int i = 0; i < 16; i++)
+            {
+                string name = Figures.FigureGenerator.Generate(seed + (ulong)i, 3, false).Name;
+                if (!IsBlocked(name)) return name;
+            }
+            return "RONIN";
+        }
+
+        /// <summary>Syllable names can spell words nobody wants as a name; re-roll those.</summary>
+        public static bool IsBlocked(string name)
+        {
+            string n = name.ToUpperInvariant();
+            foreach (string bad in new[] { "SUKA", "KAKA", "PIZD", "HUY", "HUI", "NIG", "FAG", "ANAL", "SEX", "CUM", "PUTA", "KUR", "DICK", "PENIS", "RAPE", "NAZI" })
+                if (n.Contains(bad)) return true;
+            return false;
+        }
 
         /// <summary>Brings a deserialised profile to the current schema. Returns false if it cannot be used.</summary>
         public bool Migrate()

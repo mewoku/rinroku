@@ -40,17 +40,19 @@ namespace Ronriku.Domain.Arcade
             c.MonsterHp = (int)Math.Round(c.MonsterHp * (1.0 + 0.12 * heat));
             c.AttackMs = Math.Max(5000, c.AttackMs - 700 * heat);
             c.Tier = TierFor(c.Tier, heat);
+            c.Heat = heat;
             return c;
         }
 
         public static CardsConfig Apply(CardsConfig c, int heat)
         {
             c.Target = (int)Math.Round(c.Target * (1.0 + 0.11 * heat) / 10.0) * 10;
+            c.Heat = heat;
             return c;
         }
 
         /// <summary>Beat Crawl: music beats per hero move. Struggling players get a slower walk.</summary>
-        public static int CrawlBeatsPerMove(int tuned, int heat) => heat <= -1 ? Math.Max(tuned, 3) : heat >= 2 ? Math.Max(1, tuned - 1) : tuned;
+        public static int CrawlBeatsPerMove(int tuned, int heat) => heat <= -1 ? Math.Max(tuned, 3) : tuned;
 
         public static string Label(int heat) => heat switch
         {

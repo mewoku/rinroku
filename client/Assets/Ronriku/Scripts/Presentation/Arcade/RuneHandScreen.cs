@@ -426,7 +426,7 @@ namespace Ronriku.Presentation.Arcade
                 Stars = _state.Stars,
                 ElapsedMs = Mathf.RoundToInt((Time.realtimeSinceStartup - _startedAt) * 1000f),
                 Score = _state.Score,
-                Proof = "C1:" + string.Join(",", Array.ConvertAll(_state.Config.Charms, c => ((int)c).ToString())) + "|" + string.Join(",", _state.Log)
+                Proof = "C1:h" + _state.Config.Heat + "|" + string.Join(",", Array.ConvertAll(_state.Config.Charms, c => ((int)c).ToString())) + "|" + string.Join(",", _state.Log)
             };
             if (_state.Won)
             {

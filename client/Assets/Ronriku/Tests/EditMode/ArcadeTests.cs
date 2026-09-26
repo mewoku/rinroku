@@ -375,6 +375,35 @@ namespace Ronriku.Tests
         }
 
         [Test]
+        public void BattleProof_ReplaysExactly_IncludingSwingTiming()
+        {
+            var config = Adaptive.Apply(LevelModes.Battle(LevelDef.For(0, 1)), 0);
+            var live = new BattleState(config);
+            int step = 0;
+            while (!live.Over)
+            {
+                if (step == 3) live.MonsterSwing();
+                live.Answer(step == 5 ? -1 : live.Current.Answer, 2000 + step * 300);
+                step++;
+            }
+            string proof = "B1:h0|" + string.Join("", System.Linq.Enumerable.Select(live.Log, e => $"{e.answer}@{e.ms},")) + "|" +
+                string.Join("", System.Linq.Enumerable.Select(live.SwingsAt, i => $"s{i},"));
+            var replay = BattleState.Replay(config, proof);
+            Assert.That(replay.Won, Is.EqualTo(live.Won));
+            Assert.That(replay.Hp, Is.EqualTo(live.Hp));
+            Assert.That(replay.Hearts, Is.EqualTo(live.Hearts));
+            Assert.That(replay.Stars, Is.EqualTo(live.Stars));
+        }
+
+        [Test]
+        public void FriendlyNames_AreStable_AndAvoidBlockedWords()
+        {
+            Assert.That(Ronriku.Domain.Player.PlayerProfile.FriendlyName("abc"), Is.EqualTo(Ronriku.Domain.Player.PlayerProfile.FriendlyName("abc")));
+            for (int i = 0; i < 3000; i++)
+                Assert.That(Ronriku.Domain.Player.PlayerProfile.IsBlocked(Ronriku.Domain.Player.PlayerProfile.FriendlyName("player-" + i)), Is.False);
+        }
+
+        [Test]
         public void Layout_HasEveryModeInEveryWorld()
         {
             Assert.That(LevelModes.Layout.Length, Is.EqualTo(LevelDef.LevelsPerWorld));

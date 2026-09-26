@@ -1,0 +1,27 @@
+{
+  "name": "ronriku-marketing-video",
+  "private": true,
+  "version": "0.1.0",
+  "description": "RONRIKU video ads (Remotion). Plan: docs/pitch/04-video-ads.md",
+  "type": "module",
+  "scripts": {
+    "prepare:assets": "node scripts/prepare.mjs",
+    "studio": "node scripts/prepare.mjs && remotion studio",
+    "typecheck": "tsc --noEmit",
+    "render:tiktok": "node scripts/prepare.mjs && remotion render Tiktok15 out/tiktok15.mp4 --codec=h264 --crf=18 --concurrency=1",
+    "render:trailer": "node scripts/prepare.mjs && remotion render Trailer30 out/trailer30.mp4 --codec=h264 --crf=18 --concurrency=1",
+    "render:bumper": "node scripts/prepare.mjs && remotion render Bumper6 out/bumper6.mp4 --codec=h264 --crf=18 --concurrency=1",
+    "render:all": "npm run render:tiktok && npm run render:trailer && npm run render:bumper",
+    "still:tiktok": "node scripts/prepare.mjs && remotion still Tiktok15 out/tiktok15-frame.png --frame=20"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.529",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "remotion": "4.0.529"
+  },
+  "devDependencies": {
+    "@types/react": "18.3.12",
+    "typescript": "5.6.3"
+  }
+}

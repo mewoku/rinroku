@@ -16,7 +16,11 @@ namespace Ronriku.Presentation.Arcade
         private const string Key = "ronriku.howto.";
 
         public static bool Seen(LevelMode mode) => PlayerPrefs.GetInt(Key + mode, 0) == 1;
-        public static void MarkSeen(LevelMode mode) => PlayerPrefs.SetInt(Key + mode, 1);
+        public static void MarkSeen(LevelMode mode)
+        {
+            PlayerPrefs.SetInt(Key + mode, 1);
+            PlayerPrefs.Save();
+        }
 
         public static (string icon, string text)[] Lines(LevelMode mode) => mode switch
         {
@@ -40,7 +44,7 @@ namespace Ronriku.Presentation.Arcade
             },
             LevelMode.Crawl => new[]
             {
-                ("note", "MONSTERS MOVE ON THE BEAT. YOU GET ONE STEP PER BEAT"),
+                ("note", "MONSTERS MOVE WHEN THE BEAT BAR PULSES. YOU GET ONE STEP PER PULSE"),
                 ("bolt", "STEP INTO A MONSTER TO HIT IT. ARROWS SHOW THEIR NEXT STEP"),
                 ("star", "CLEAR THE ROOM, THEN TAKE THE STAIRS")
             },

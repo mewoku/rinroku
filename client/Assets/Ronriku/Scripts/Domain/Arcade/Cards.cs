@@ -175,6 +175,7 @@ namespace Ronriku.Domain.Arcade
         public int Discards = 3;
         public int HandSize = 7;
         public CharmId[] Charms = Array.Empty<CharmId>();
+        public int Heat;
     }
 
     /// <summary>

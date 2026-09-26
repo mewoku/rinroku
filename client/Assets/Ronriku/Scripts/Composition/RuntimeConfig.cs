@@ -24,12 +24,16 @@ namespace Ronriku.Composition
 
         public static DateTime UtcNow => UtcNowOverride ?? DateTime.UtcNow;
 
+        /// <summary>Skip first-run how-to cards (tests drive levels directly).</summary>
+        public static bool SkipHowTo { get; set; }
+
         public static void Reset()
         {
             OnlineEnabled = true;
             Competitive = false;
             ProfileDirectory = null;
             UtcNowOverride = null;
+            SkipHowTo = false;
         }
     }
 }

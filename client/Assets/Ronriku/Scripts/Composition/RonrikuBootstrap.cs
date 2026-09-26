@@ -355,9 +355,17 @@ namespace Ronriku.Composition
         /// <summary>Adventure levels (v3): each index plays a fixed arcade mode (Domain/Arcade/LevelModes).</summary>
         private void PlayLevel(int world, int index)
         {
+            LevelMode firstMode = LevelModes.For(index);
+            if (!HowToScreen.Seen(firstMode) && !RuntimeConfig.SkipHowTo)
+            {
+                Palette hp = LevelDef.For(world, index).IsBoss ? RonrikuTheme.Boss : RonrikuTheme.Worlds[world % RonrikuTheme.Worlds.Length];
+                _shell.ShowFullscreen(new HowToScreen(firstMode, hp, BackToMap, () => PlayLevel(world, index)), hp);
+                return;
+            }
             ClearCurrent();
             LevelDef def = LevelDef.For(world, index);
             LevelMode mode = LevelModes.For(index);
+            int heat = Adaptive.Heat(_profile, mode);
             Palette palette = def.IsBoss ? RonrikuTheme.Boss : RonrikuTheme.Worlds[world % RonrikuTheme.Worlds.Length];
             Figure hero = ShopCatalogue.Build(_profile.Avatar);
             Figure monster = def.Monster();
@@ -371,21 +379,22 @@ namespace Ronriku.Composition
             switch (mode)
             {
                 case LevelMode.Battle:
-                    _shell.ShowFullscreen(Battle(LevelModes.Battle(def), hero, monster, palette, title, done), palette);
+                    _shell.ShowFullscreen(Battle(Adaptive.Apply(LevelModes.Battle(def), heat), hero, monster, palette, title, done), palette);
                     break;
                 case LevelMode.Cards:
                     _shell.ShowFullscreen(new CharmPickScreen(LevelModes.CharmOffer(def), 1, palette, title, BackToMap, charms =>
-                        _shell.ShowFullscreen(Cards(LevelModes.Cards(def, charms), hero, monster, palette, title, done), palette)), palette);
+                        _shell.ShowFullscreen(Cards(Adaptive.Apply(LevelModes.Cards(def, charms), heat), hero, monster, palette, title, done), palette)), palette);
                     break;
                 case LevelMode.Dash:
-                    _shell.ShowFullscreen(new DashScreen(LevelModes.Dash(def), hero, palette, title, BackToMap, done), palette);
+                    _shell.ShowFullscreen(new DashScreen(DashLevel.Generate(Ronriku.Domain.Daily.DailyPlan.Mix(def.Seed, 33), Adaptive.TierFor(LevelModes.Tier(world, index), heat)), hero, palette, title, BackToMap, done), palette);
                     break;
                 case LevelMode.Crawl:
-                    _shell.ShowFullscreen(new CrawlScreen(LevelModes.Crawl(def), hero, palette, title, BackToMap, done), palette);
+                    _shell.ShowFullscreen(new CrawlScreen(CrawlLevel.Generate(Ronriku.Domain.Daily.DailyPlan.Mix(def.Seed, 44), Adaptive.TierFor(LevelModes.Tier(world, index), heat)), hero, palette, title, BackToMap, done,
+                        Adaptive.CrawlBeatsPerMove(RonrikuTuning.Current.musicBeatsPerMove, heat)), palette);
                     break;
                 default:
                     // Boss: phase 1 battle, phase 2 rune hand with two charms. Stars = the weaker phase.
-                    _shell.ShowFullscreen(Battle(LevelModes.BossBattle(def), hero, monster, palette, title + "  ·  1/2", first =>
+                    _shell.ShowFullscreen(Battle(Adaptive.Apply(LevelModes.BossBattle(def), heat), hero, monster, palette, title + "  ·  1/2", first =>
                     {
                         if (!first.Won)
                         {
@@ -394,7 +403,7 @@ namespace Ronriku.Composition
                         }
                         Music.Stinger(MusicStinger.LevelUp);
                         _shell.ShowFullscreen(new CharmPickScreen(LevelModes.CharmOffer(def), 2, palette, title + "  ·  2/2", BackToMap, charms =>
-                            _shell.ShowFullscreen(Cards(LevelModes.BossCards(def, charms), hero, monster, palette, title + "  ·  2/2", second => done(new ArcadeResult
+                            _shell.ShowFullscreen(Cards(Adaptive.Apply(LevelModes.BossCards(def, charms), heat), hero, monster, palette, title + "  ·  2/2", second => done(new ArcadeResult
                             {
                                 Won = second.Won,
                                 Stars = Math.Min(first.Stars, second.Stars),
@@ -436,6 +445,11 @@ namespace Ronriku.Composition
         {
             int stars = result.Won ? Mathf.Clamp(result.Stars, 1, 3) : 0;
             int earned = stars > 0 ? AdventureProgress.Complete(_profile, world, index, stars, result.ElapsedMs) : 0;
+            LevelRecord levelRecord = _profile.LevelRecordFor(world, index);
+            if (stars > 0 && levelRecord != null && stars >= levelRecord.stars) levelRecord.proof = result.Proof;
+            int heatBefore = Adaptive.Heat(_profile, mode);
+            int heatAfter = Adaptive.Record(_profile, mode, stars > 0, stars);
+            Save();
             _analytics.Track(stars > 0 ? "level_won" : "level_lost", new Dictionary<string, string>
             {
                 ["world"] = world.ToString(), ["level"] = index.ToString(), ["mode"] = mode.ToString().ToLowerInvariant(),
@@ -444,8 +458,8 @@ namespace Ronriku.Composition
             if (stars > 0)
             {
                 Save();
-                string modeName = mode.ToString().ToLowerInvariant();
-                Submit("level", () => _online.CompleteArcadeLevel(world, index, modeName, stars, result.ElapsedMs, result.Proof));
+                // Uploads this clear plus any earlier ones the server hasn't seen (offline play), in order.
+                Submit("level", () => _online.SyncArcadeLevels(_profile));
             }
             Music.Stinger(stars > 0 ? MusicStinger.Victory : MusicStinger.Defeat);
             Music.SetIntensity(0);
@@ -460,12 +474,29 @@ namespace Ronriku.Composition
                 ElapsedMs = result.ElapsedMs,
                 Monster = monster,
                 Palette = palette,
-                NextLabel = boss && stars > 0 ? (world + 1 < LevelDef.WorldCount ? "NEXT WORLD" : "CONTINUE") : "CONTINUE"
+                NextLabel = boss && stars > 0 ? (world + 1 < LevelDef.WorldCount ? "NEXT WORLD" : "CONTINUE") : "CONTINUE",
+                Stats = mode switch
+                {
+                    LevelMode.Cards => $"SCORE {result.Score}",
+                    LevelMode.Dash => $"MOVES {result.Score}",
+                    LevelMode.Crawl => $"BEST COMBO {result.BestCombo}",
+                    _ => $"DAMAGE {result.Score}  ·  BEST COMBO {result.BestCombo}"
+                },
+                Tip = mode switch
+                {
+                    LevelMode.Cards => "TAP HINT TO SEE THE STRONGEST HAND. DISCARD RUNES THAT DON'T MATCH",
+                    LevelMode.Dash => "PLAN FROM THE DOOR BACKWARDS. WALLS ARE YOUR BRAKES",
+                    LevelMode.Crawl => "WATCH THE ARROWS: STEP WHERE MONSTERS WON'T BE. THE GAME GETS SLOWER IF YOU STRUGGLE",
+                    _ => "ANSWER FAST TO PUSH THE MONSTER'S TIMER BACK. STREAKS OF 3 HIT MUCH HARDER"
+                }
             }, () =>
             {
                 if (boss && stars > 0) PlayMapScreen.LastWorld = Mathf.Min(world + 1, LevelDef.WorldCount - 1);
                 BackToMap();
             }, () => PlayLevel(world, index)), palette);
+            if (heatAfter != heatBefore)
+                Toast.Show(_shell, heatAfter > heatBefore ? $"{LevelModes.Name(mode)} HEATS UP  ·  {Adaptive.Label(heatAfter)}" : $"{LevelModes.Name(mode)} EASES OFF  ·  {Adaptive.Label(heatAfter)}",
+                    heatAfter > heatBefore ? RonrikuTheme.Hex("FF8A3D") : RonrikuTheme.Teal);
         }
 
         /// <summary>Runs boss stages one after another; any skipped/failed stage loses the fight.</summary>

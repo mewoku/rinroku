@@ -23,6 +23,7 @@ namespace Ronriku.Presentation.Arcade
         private Label _sumLabel;
         private readonly List<Button> _tiles = new List<Button>();
         private readonly Button[] _cells = new Button[16];
+        private ArrowBoard _arrowBoard;
 
         public event Action<int> Answered;
         /// <summary>Raised when a timed "show" phase (Memory) starts/ends, so the battle can pause its swing clock.</summary>
@@ -96,6 +97,7 @@ namespace Ronriku.Presentation.Arcade
                     }
                     break;
                 default:
+                    if (_arrowBoard != null) _arrowBoard.PlayPath();
                     if (_challenge.Answer >= 0 && _challenge.Answer < _optionFrames.Count) _optionFrames[_challenge.Answer](RonrikuTheme.Teal);
                     if (!correct && answer >= 0 && answer < _optionFrames.Count) _optionFrames[answer](RonrikuTheme.Red);
                     break;
@@ -327,7 +329,7 @@ namespace Ronriku.Presentation.Arcade
 
         private void BuildArrows(VisualElement body)
         {
-            var board = new ArrowBoard(_challenge, _palette.Accent);
+            var board = _arrowBoard = new ArrowBoard(_challenge, _palette.Accent);
             board.style.width = board.style.height = 250;
             board.style.marginBottom = 12;
             body.Add(board);
@@ -421,11 +423,29 @@ namespace Ronriku.Presentation.Arcade
     {
         private readonly Challenge _c;
         private readonly Color _accent;
+        private int _ball;
+
+        /// <summary>After answering, the ball rolls along the arrows so the rule is shown, not just told.</summary>
+        public void PlayPath()
+        {
+            int cell = _c.Target, steps = 0;
+            IVisualElementScheduledItem item = null;
+            item = schedule.Execute(() =>
+            {
+                _ball = cell;
+                MarkDirtyRepaint();
+                var (dx, dy) = Challenges.Directions[_c.Items[cell]];
+                int x = cell % Challenges.ArrowSize + dx, y = cell / Challenges.ArrowSize + dy;
+                if (x < 0 || y < 0 || x >= Challenges.ArrowSize || y >= Challenges.ArrowSize || ++steps > 20) { item.Pause(); return; }
+                cell = x + Challenges.ArrowSize * y;
+            }).Every(70);
+        }
 
         public ArrowBoard(Challenge c, Color accent)
         {
             _c = c;
             _accent = accent;
+            _ball = c.Target;
             pickingMode = PickingMode.Ignore;
             generateVisualContent += Draw;
         }
@@ -444,7 +464,7 @@ namespace Ronriku.Presentation.Arcade
                 Glyphs.Rect(p, tl, cell - 4, cell - 4, option >= 0 ? RonrikuTheme.WithAlpha(RonrikuTheme.Yellow, 0.18f) : RonrikuTheme.NearBlack);
                 var center = tl + new Vector2(cell - 4, cell - 4) * 0.5f;
                 Glyphs.Shape(p, Token.Arrow, center, cell * 0.28f, i == _c.Target ? RonrikuTheme.Text : RonrikuTheme.BlueGrey, _c.Items[i]);
-                if (i == _c.Target) Glyphs.Shape(p, Token.Circle, center, cell * 0.2f, _accent);
+                if (i == _ball) Glyphs.Shape(p, Token.Circle, center, cell * 0.22f, _accent);
                 if (option >= 0) PixelLabel.DrawCentered(p, ((char)('A' + option)).ToString(), tl + new Vector2(cell * 0.2f, cell * 0.2f), cell * 0.035f, RonrikuTheme.Yellow);
             }
         }

@@ -67,6 +67,7 @@ namespace Ronriku.Infrastructure.Online
             try
             {
                 await Pull(profile);
+                if (await SyncArcadeLevels(profile) > 0) await Pull(profile);
                 Connected = true;
                 LastError = null;
             }
@@ -81,6 +82,42 @@ namespace Ronriku.Infrastructure.Online
         }
 
         /// <summary>Refreshes balances, figures and levels from the server.</summary>
+        /// <summary>(world, level) → stars the server has recorded, refreshed by <see cref="Pull"/>.</summary>
+        public readonly System.Collections.Generic.Dictionary<(int, int), int> ServerLevels = new System.Collections.Generic.Dictionary<(int, int), int>();
+
+        /// <summary>
+        /// Uploads arcade clears made offline (or whose submit failed), in unlock order, so the server's
+        /// unlock chain matches the device. Stops at the first rejection. Returns how many were synced.
+        /// </summary>
+        public async Task<int> SyncArcadeLevels(PlayerProfile profile)
+        {
+            var pending = new System.Collections.Generic.List<LevelRecord>();
+            foreach (LevelRecord r in profile.levels)
+            {
+                if (string.IsNullOrEmpty(r.proof) || r.stars <= 0) continue;
+                if (ServerLevels.TryGetValue((r.world, r.level), out int serverStars) && serverStars >= r.stars) continue;
+                pending.Add(r);
+            }
+            pending.Sort((a, b) => a.world != b.world ? a.world.CompareTo(b.world) : a.level.CompareTo(b.level));
+            int synced = 0;
+            foreach (LevelRecord r in pending)
+            {
+                string mode = Ronriku.Domain.Arcade.LevelModes.For(r.level).ToString().ToLowerInvariant();
+                try
+                {
+                    await CompleteArcadeLevel(r.world, r.level, mode, r.stars, Math.Max(1, r.bestMs), r.proof);
+                    ServerLevels[(r.world, r.level)] = r.stars;
+                    synced++;
+                }
+                catch (Exception e)
+                {
+                    Debug.Log($"RONRIKU online: level sync stopped at w{r.world} l{r.level}: {(e is OnlineException oe ? oe.Code : e.Message)}");
+                    break;
+                }
+            }
+            return synced;
+        }
+
         public async Task Pull(PlayerProfile profile)
         {
             JToken me = await _client.Rpc("ensure_profile");
@@ -115,9 +152,11 @@ namespace Ronriku.Infrastructure.Online
             }
 
             JArray levels = await _client.Select("level_progress", "select=world,level,stars,best_ms");
+            ServerLevels.Clear();
             foreach (JToken l in levels)
             {
                 int world = l["world"].Value<int>(), level = l["level"].Value<int>();
+                ServerLevels[(world, level)] = l["stars"].Value<int>();
                 LevelRecord record = profile.LevelRecordFor(world, level);
                 if (record == null) profile.levels.Add(record = new LevelRecord { world = world, level = level });
                 record.stars = Math.Max(record.stars, l["stars"].Value<int>());

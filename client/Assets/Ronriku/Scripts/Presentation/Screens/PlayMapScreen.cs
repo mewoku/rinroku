@@ -321,7 +321,7 @@ namespace Ronriku.Presentation.Screens
             title.style.marginTop = 4;
             info.Add(title);
             var sub = UiFactory.Label(record != null ? $"BEST {record.stars}/3 STARS  ·  REPLAY" :
-                def.IsBoss ? $"{LevelModes.Hint(mode)}  ·  +300" : $"{LevelModes.Hint(mode)}  ·  +{Economy.LevelBase}", 11, RonrikuTheme.Muted);
+                def.IsBoss ? $"{LevelModes.Hint(mode)}  ·  +300" : $"{LevelModes.Hint(mode)}  ·  {Adaptive.Label(Adaptive.Heat(_profile, mode))}", 11, RonrikuTheme.Muted);
             sub.style.unityTextAlign = TextAnchor.MiddleLeft;
             sub.style.marginTop = 2;
             info.Add(sub);

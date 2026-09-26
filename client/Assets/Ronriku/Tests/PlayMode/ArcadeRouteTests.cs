@@ -27,6 +27,7 @@ namespace Ronriku.Tests
             _profileDir = Path.Combine(Path.GetTempPath(), "ronriku-arcade-" + Guid.NewGuid().ToString("N"));
             RuntimeConfig.ProfileDirectory = _profileDir;
             RuntimeConfig.OnlineEnabled = false;
+            RuntimeConfig.SkipHowTo = true;
             RuntimeConfig.UtcNowOverride = new DateTime(2026, 9, 23, 12, 0, 0, DateTimeKind.Utc);
         }
 
@@ -130,6 +131,24 @@ namespace Ronriku.Tests
         }
 
         [UnityTest]
+        public IEnumerator FirstRun_ShowsHowTo_ThenTheLevel_OnlyOnce()
+        {
+            RuntimeConfig.SkipHowTo = false;
+            PlayerPrefs.DeleteKey("ronriku.howto.Dash");
+            RonrikuBootstrap app = null;
+            yield return Load(a => app = a);
+            var root = Root(app);
+            PlayLevel(app, 0, 2);
+            Assert.That(root.Q("how-to"), Is.Not.Null, "first dash shows how to play");
+            Click(root.Q<Button>("howto-go"));
+            yield return null;
+            Assert.That(root.Q<DashScreen>(), Is.Not.Null);
+            PlayLevel(app, 0, 2);
+            Assert.That(root.Q("how-to"), Is.Null, "only once");
+            Assert.That(root.Q<DashScreen>(), Is.Not.Null);
+        }
+
+        [UnityTest]
         public IEnumerator Cards_PickCharm_PlayHintedHands_ReachesAResult()
         {
             RonrikuBootstrap app = null;
@@ -190,8 +209,8 @@ namespace Ronriku.Tests
             PlayLevel(app, 0, 5);
             var crawl = root.Q<CrawlScreen>();
             Assert.That(crawl, Is.Not.Null, "level 6 is beat crawl");
-            yield return new WaitForSecondsRealtime(3.5f);
-            Assert.That(crawl.State.Beat, Is.GreaterThan(0), "monsters act on the beat");
+            // READY banner, then two grace beats where monsters hold still, then they act on the beat.
+            yield return WaitFor(() => crawl.State.Beat > 0, 10f, "monsters act on the beat");
             int hero = crawl.State.Hero;
             for (int d = 0; d < 4 && crawl.State.Hero == hero; d++)
             {

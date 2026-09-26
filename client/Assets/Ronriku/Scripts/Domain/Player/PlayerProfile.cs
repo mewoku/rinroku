@@ -40,6 +40,8 @@ namespace Ronriku.Domain.Player
         public int level;
         public int stars;
         public int bestMs;
+        /// <summary>Compact input replay of the best arcade run; lets offline clears sync later.</summary>
+        public string proof;
     }
 
     /// <summary>
@@ -72,6 +74,8 @@ namespace Ronriku.Domain.Player
         public List<LevelRecord> levels = new List<LevelRecord>();
         /// <summary>Boss event ids already beaten; rewards pay once per boss, like the server.</summary>
         public List<string> bossWins = new List<string>();
+        /// <summary>Adaptive difficulty per arcade mode (Domain/Arcade/Adaptive). Local only.</summary>
+        public List<int> modeHeat = new List<int>();
 
         public OwnedFigure Avatar
         {
@@ -143,6 +147,7 @@ namespace Ronriku.Domain.Player
             figures ??= new List<OwnedFigure>();
             levels ??= new List<LevelRecord>();
             bossWins ??= new List<string>();
+            modeHeat ??= new List<int>();
             if (figures.Count == 0) GrantStarterFigure();
             if (string.IsNullOrEmpty(avatarFigureId)) avatarFigureId = figures[0].id;
             foreach (string name in SkillDimensions.All)

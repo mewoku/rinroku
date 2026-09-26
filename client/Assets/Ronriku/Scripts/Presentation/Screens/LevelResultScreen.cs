@@ -19,6 +19,10 @@ namespace Ronriku.Presentation.Screens
         public Figure Monster;
         public Palette Palette;
         public string NextLabel = "CONTINUE";
+        /// <summary>Run stats line (arcade: damage / score, best combo).</summary>
+        public string Stats;
+        /// <summary>A short tip shown after a loss.</summary>
+        public string Tip;
     }
 
     /// <summary>Level / boss outcome: defeated guardian, stars popping in, shard count-up.</summary>
@@ -99,6 +103,20 @@ namespace Ronriku.Presentation.Screens
             var time = UiFactory.Label($"{model.ElapsedMs / 60000:00}:{model.ElapsedMs / 1000 % 60:00}", 12, RonrikuTheme.Muted);
             time.style.marginTop = 4;
             Add(time);
+            if (!string.IsNullOrEmpty(model.Stats))
+            {
+                var stats = UiFactory.Heading(model.Stats, 12, RonrikuTheme.Text);
+                stats.name = "result-stats";
+                stats.style.marginTop = 8;
+                Add(stats);
+            }
+            if (!model.Won && !string.IsNullOrEmpty(model.Tip))
+            {
+                var tip = UiFactory.Paragraph("TIP: " + model.Tip, 12, RonrikuTheme.Yellow);
+                tip.name = "result-tip";
+                tip.style.marginTop = 12;
+                Add(tip);
+            }
 
             var go = UiFactory.GlowButton(model.NextLabel, next, model.Palette);
             go.name = "result-continue";

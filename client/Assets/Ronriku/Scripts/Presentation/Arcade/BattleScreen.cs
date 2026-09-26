@@ -155,6 +155,16 @@ namespace Ronriku.Presentation.Arcade
                 }
             };
             _cardSlot.Add(_view);
+            if (_state.Combo >= BattleState.HeatCombo)
+            {
+                var hot = UiFactory.Heading("HOT STREAK  +5 CHIPS", 10, RonrikuTheme.Gold);
+                hot.name = "hot-badge";
+                hot.style.position = Position.Absolute;
+                hot.style.top = 6;
+                hot.style.right = 10;
+                _view.Add(hot);
+                UiFactory.SetBorder(_view, 2, RonrikuTheme.Gold);
+            }
             Juice.SlideIn(_view);
             _challengeStart = Time.realtimeSinceStartup;
             _shownMs = 0;

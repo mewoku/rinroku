@@ -57,6 +57,9 @@ namespace Ronriku.Domain.Arcade
         public const int FastMs = 2500;
         public const int SlowMs = 9000;
         public const int MaxMult = 6;
+        /// <summary>Combo at which cards turn HARD (one tier up, +5 base chips).</summary>
+        public const int HeatCombo = 3;
+        public const int HardBonus = 5;
 
         private readonly List<(int answer, int ms)> _log = new List<(int, int)>();
         private int _lastKind = -1;
@@ -69,6 +72,8 @@ namespace Ronriku.Domain.Arcade
         public int Index { get; private set; }
         public int MonsterSwings { get; private set; }
         public Challenge Current { get; private set; }
+        /// <summary>True when the current card is a HARD card (streak escalation).</summary>
+        public bool CurrentHard { get; private set; }
         public IReadOnlyList<(int answer, int ms)> Log => _log;
 
         public bool Won => Hp <= 0;
@@ -90,7 +95,9 @@ namespace Ronriku.Domain.Arcade
             int pick = rng.NextInt(pool.Length);
             if (pool.Length > 1 && pick == _lastKind) pick = (pick + 1 + rng.NextInt(pool.Length - 1)) % pool.Length;
             _lastKind = pick;
-            return Challenges.Generate(pool[pick], DailyPlan.Mix(Config.Seed, 1000 + index), Config.Tier);
+            CurrentHard = Config.Tier == 0 && Combo >= HeatCombo;
+            int tier = CurrentHard ? 1 : Config.Tier;
+            return Challenges.Generate(pool[pick], DailyPlan.Mix(Config.Seed, 1000 + index), tier);
         }
 
         public static int SpeedBonus(int ms)
@@ -109,13 +116,14 @@ namespace Ronriku.Domain.Arcade
             if (correct)
             {
                 int speed = SpeedBonus(thinkMs);
-                int chips = BaseChips + speed;
+                int baseChips = BaseChips + (CurrentHard || (Config.Tier > 0 && Combo >= HeatCombo) ? HardBonus : 0);
+                int chips = baseChips + speed;
                 int mult = Math.Min(MaxMult, 1 + Combo);
                 int damage = chips * mult;
                 Hp = Math.Max(0, Hp - damage);
                 Combo++;
                 BestCombo = Math.Max(BestCombo, Combo);
-                result = new HitResult(true, BaseChips, speed, mult, damage, Combo);
+                result = new HitResult(true, baseChips, speed, mult, damage, Combo);
             }
             else
             {

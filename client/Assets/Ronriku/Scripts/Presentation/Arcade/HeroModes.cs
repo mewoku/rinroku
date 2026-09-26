@@ -406,7 +406,9 @@ namespace Ronriku.Presentation.Arcade
     public sealed class CrawlScreen : VisualElement
     {
         /// <summary>Game beats are every second music beat so there is time to think.</summary>
-        private static int MusicBeatsPerMove => RonrikuTuning.Current.musicBeatsPerMove;
+        private int MusicBeatsPerMove => _beatsPerMove > 0 ? _beatsPerMove : RonrikuTuning.Current.musicBeatsPerMove;
+        private readonly int _beatsPerMove;
+        private int _graceBeats = 2;
         private static float FallbackSecondsPerMove => RonrikuTuning.Current.fallbackSecondsPerMove;
         private static float Window => RonrikuTuning.Current.beatWindow;
 
@@ -431,8 +433,9 @@ namespace Ronriku.Presentation.Arcade
 
         public CrawlState State => _state;
 
-        public CrawlScreen(CrawlLevel level, Figure hero, Palette palette, string title, Action back, Action<ArcadeResult> completed)
+        public CrawlScreen(CrawlLevel level, Figure hero, Palette palette, string title, Action back, Action<ArcadeResult> completed, int beatsPerMove = 0)
         {
+            _beatsPerMove = beatsPerMove;
             _state = new CrawlState(level);
             _palette = palette;
             _completed = completed;
@@ -542,6 +545,13 @@ namespace Ronriku.Presentation.Arcade
             while (_lastBeat < beat)
             {
                 _lastBeat++;
+                if (_graceBeats > 0)
+                {
+                    // First beats: monsters hold still while the player finds the rhythm.
+                    _graceBeats--;
+                    Juice.Popup(_overlay, _overlay.WorldToLocal(_beatBar.worldBound.center) + new Vector2(0, 40), _graceBeats == 1 ? "2" : "GO!", _palette.Accent, 22, 20f, 0.5f);
+                    continue;
+                }
                 // A beat passed with no move while enemies close in: the combo survives only on moves.
                 bool hit = _state.Tick();
                 _proof.Append('|');

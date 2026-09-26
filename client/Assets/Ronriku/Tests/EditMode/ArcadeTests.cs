@@ -330,6 +330,51 @@ namespace Ronriku.Tests
         }
 
         [Test]
+        public void Adaptive_HeatRisesOnCleanWins_FallsOnLosses_AndScalesDifficulty()
+        {
+            var profile = new Ronriku.Domain.Player.PlayerProfile();
+            Assert.That(Adaptive.Heat(profile, LevelMode.Battle), Is.EqualTo(0));
+            Adaptive.Record(profile, LevelMode.Battle, true, 3);
+            Adaptive.Record(profile, LevelMode.Battle, true, 3);
+            Adaptive.Record(profile, LevelMode.Battle, true, 3);
+            Assert.That(Adaptive.Heat(profile, LevelMode.Battle), Is.EqualTo(Adaptive.Max));
+            Adaptive.Record(profile, LevelMode.Battle, true, 2);
+            Assert.That(Adaptive.Heat(profile, LevelMode.Battle), Is.EqualTo(Adaptive.Max), "scrappy wins hold");
+            Adaptive.Record(profile, LevelMode.Cards, false, 0);
+            Assert.That(Adaptive.Heat(profile, LevelMode.Cards), Is.EqualTo(-1));
+            Assert.That(Adaptive.Heat(profile, LevelMode.Battle), Is.EqualTo(Adaptive.Max), "modes are independent");
+
+            var def = LevelDef.For(1, 4);
+            var hot = Adaptive.Apply(LevelModes.Battle(def), 2);
+            var cold = Adaptive.Apply(LevelModes.Battle(def), -2);
+            Assert.That(hot.MonsterHp, Is.GreaterThan(cold.MonsterHp));
+            Assert.That(hot.AttackMs, Is.LessThan(cold.AttackMs));
+            Assert.That(cold.Tier, Is.EqualTo(0));
+            Assert.That(Adaptive.Apply(LevelModes.Cards(def), 1).Target, Is.GreaterThan(Adaptive.Apply(LevelModes.Cards(def), -1).Target));
+            Assert.That(Adaptive.CrawlBeatsPerMove(2, -1), Is.EqualTo(3));
+            // Even a chilled battle stays winnable in a handful of clean answers.
+            var b = new BattleState(cold);
+            int n = 0;
+            while (!b.Over) { b.Answer(b.Current.Answer, 3000); n++; }
+            Assert.That(b.Won && n >= 3);
+        }
+
+        [Test]
+        public void Battle_HotStreak_DealsHardCardsWorthMore()
+        {
+            var b = new BattleState(new BattleConfig { Seed = 42, MonsterHp = 100000, AttackMs = 9000, Pool = BattleConfig.PoolFor(4), Tier = 0 });
+            for (int i = 0; i < BattleState.HeatCombo; i++)
+            {
+                Assert.That(b.CurrentHard, Is.False);
+                b.Answer(b.Current.Answer, BattleState.SlowMs);
+            }
+            Assert.That(b.CurrentHard, Is.True);
+            Assert.That(b.Current.Tier, Is.EqualTo(1));
+            HitResult hit = b.Answer(b.Current.Answer, BattleState.SlowMs);
+            Assert.That(hit.Chips, Is.EqualTo(BattleState.BaseChips + BattleState.HardBonus));
+        }
+
+        [Test]
         public void Layout_HasEveryModeInEveryWorld()
         {
             Assert.That(LevelModes.Layout.Length, Is.EqualTo(LevelDef.LevelsPerWorld));

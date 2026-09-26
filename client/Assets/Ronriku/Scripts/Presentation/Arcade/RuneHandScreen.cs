@@ -246,6 +246,7 @@ namespace Ronriku.Presentation.Arcade
                 card.RegisterCallback<PointerDownEvent>(_ => Toggle(index));
                 _cards.Add(card);
                 _handRow.Add(card);
+                Juice.DealIn(card, i);
             }
             _counts.text = $"HANDS {_state.HandsLeft}  ·  DISCARDS {_state.DiscardsLeft}";
             _discard.SetEnabled(_state.DiscardsLeft > 0);

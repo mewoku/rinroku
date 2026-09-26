@@ -287,6 +287,7 @@ namespace Ronriku.Presentation.Arcade
             UpdateMoves();
             _board.MoveHero(slide.Path, 55f, cell =>
             {
+                Juice.Spark(_overlay, _overlay.WorldToLocal(_board.LocalToWorld(_board.CellCenter(cell))), RonrikuTheme.WithAlpha(_palette.Accent, 0.8f), 12f, 0.4f);
                 if (slide.Collected.Contains(cell))
                 {
                     _board.ShownGems |= 1 << System.Array.IndexOf(_state.Level.Gems, cell);
@@ -540,6 +541,7 @@ namespace Ronriku.Presentation.Arcade
             float pulse = Mathf.Clamp01(1f - phase * 3f);
             _board.Pulse = pulse;
             _beatCore.style.scale = new Scale(Vector3.one * (1f + pulse * 0.6f));
+            if (!MotionSettings.ReducedMotion) _board.style.scale = new Scale(Vector3.one * (1f + pulse * 0.012f));
             _beatCore.style.backgroundColor = Color.Lerp(_palette.Accent, Color.white, pulse * 0.6f);
             _beatBar.MarkDirtyRepaint();
             _board.Refresh();

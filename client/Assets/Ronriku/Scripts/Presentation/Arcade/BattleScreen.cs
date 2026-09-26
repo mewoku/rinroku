@@ -42,6 +42,8 @@ namespace Ronriku.Presentation.Arcade
         private bool _finished;
         private int _totalDamage;
         private bool _bigCard;
+        private readonly DangerVignette _danger;
+        private int _lastCombo;
         private ArcadeResult _result;
         private bool _reported;
 
@@ -125,6 +127,8 @@ namespace Ronriku.Presentation.Arcade
             _cardSlot.style.overflow = Overflow.Hidden;
             Add(_cardSlot);
 
+            _danger = new DangerVignette();
+            Add(_danger);
             _overlay = new VisualElement { pickingMode = PickingMode.Ignore, name = "fx" };
             _overlay.style.position = Position.Absolute;
             _overlay.style.left = _overlay.style.right = _overlay.style.top = _overlay.style.bottom = 0;
@@ -280,6 +284,10 @@ namespace Ronriku.Presentation.Arcade
             _combo.style.color = combo >= 5 ? RonrikuTheme.Gold : combo >= 3 ? RonrikuTheme.Hex("FF8A3D") : combo > 0 ? _palette.Accent : RonrikuTheme.Muted;
             _combo.style.fontSize = 13 + Math.Min(combo, 5);
             if (combo > 0) Juice.Punch(_combo, 0.3f);
+            if (combo > _lastCombo && (combo == BattleState.HeatCombo || combo == 5 || combo == 8))
+                Juice.Banner(_overlay, combo >= 8 ? "GODLIKE" : combo >= 5 ? "UNSTOPPABLE" : "ON FIRE", combo >= 5 ? RonrikuTheme.Gold : RonrikuTheme.Hex("FF8A3D"), 0.7f);
+            _lastCombo = combo;
+            _danger.Set(_state.Hearts == 1 && !_state.Over);
             ComboChanged?.Invoke(combo);
         }
 

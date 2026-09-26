@@ -11,7 +11,7 @@ namespace Ronriku.Domain.Arcade
     /// Arcade contract for adventure levels (v3). Everything derives from LevelDef.Seed:
     ///   mode       = Layout[index]
     ///   tier       = world 1 first half → 0, everything else → 1 (kept in the middle band)
-    ///   battle     = BattleConfig { Seed = Mix(seed, 11), HP 180 + 20w + 4i, swing 9000 - 400w ms (≥ 7000) }
+    ///   battle     = BattleConfig { Seed = Mix(seed, 11), HP 180 + 20w + 4i, swing 12000 - 500w ms (≥ 8000) }
     ///   cards      = CardsConfig { Seed = Mix(seed, 22), target 540 + 10w + 6i, charms from Offer(Mix(seed, 55), 3) }
     ///   dash       = DashLevel.Generate(Mix(seed, 33), tier)
     ///   crawl      = CrawlLevel.Generate(Mix(seed, 44), tier)
@@ -52,7 +52,7 @@ namespace Ronriku.Domain.Arcade
         {
             Seed = DailyPlan.Mix(def.Seed, 11),
             MonsterHp = 180 + 20 * def.World + 4 * def.Index,
-            AttackMs = Math.Max(7000, 9000 - 400 * def.World),
+            AttackMs = Math.Max(8000, 12000 - 500 * def.World),
             Tier = Tier(def.World, def.Index),
             Pool = BattleConfig.PoolFor(def.World)
         };
@@ -74,7 +74,7 @@ namespace Ronriku.Domain.Arcade
         {
             Seed = DailyPlan.Mix(def.Seed, 11),
             MonsterHp = 360 + 40 * def.World,
-            AttackMs = Math.Max(6500, 8500 - 400 * def.World),
+            AttackMs = Math.Max(7500, 10500 - 500 * def.World),
             Tier = 1,
             Pool = BattleConfig.PoolFor(def.World)
         };

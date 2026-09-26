@@ -203,7 +203,7 @@ namespace Ronriku.Composition
                 DailyNumber = today,
                 Streak = _profile.DisplayStreak(today),
                 CompletedToday = _profile.HasCompleted(today),
-                LocalMode = RuntimeConfig.OnlineAvailable && !RuntimeConfig.Competitive,
+                LocalMode = !RuntimeConfig.Competitive,
                 PreviewCubes = preview.Cubes,
                 PreviewOrientation = preview.StartOrientation,
                 UntilReset = () => DailyCalendar.UntilReset(RuntimeConfig.UtcNow),
@@ -308,7 +308,7 @@ namespace Ronriku.Composition
                 Back = () => { _analytics.Track("puzzle_abandoned", TrialProps(spec)); _shell.ShowTab(AppTab.Daily); },
                 Completed = OnDailyTrialCompleted,
                 Header = $"DAILY {_session.Plan.Day:000}  ·  TRIAL {spec.Index + 1}/{_session.Plan.Trials.Count}",
-                Footer = $"DAILY {_session.Plan.Day:000}  ·  {RuntimeConfig.Environment.ToUpperInvariant()}",
+                Footer = RuntimeConfig.Competitive ? $"DAILY {_session.Plan.Day:000}  ·  RANKED" : $"DAILY {_session.Plan.Day:000}",
                 Palette = KindPalette(spec.Kind)
             };
             ShowTrialScreen(CreateTrial(spec.Kind, spec.Seed, spec.Difficulty, context), context.Palette);

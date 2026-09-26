@@ -152,7 +152,7 @@ namespace Ronriku.Presentation.Screens
             Continue.style.visibility = Visibility.Hidden;
             Add(Continue);
 
-            var footer = UiFactory.Label($"{context.Footer}  ·  {contentHash.Substring(0, Math.Min(8, contentHash.Length)).ToUpperInvariant()}", 9, RonrikuTheme.Muted);
+            var footer = UiFactory.Label(context.Footer ?? string.Empty, 9, RonrikuTheme.Muted);
             footer.style.height = 18;
             footer.style.flexShrink = 0;
             if (!context.Embedded) Add(footer);

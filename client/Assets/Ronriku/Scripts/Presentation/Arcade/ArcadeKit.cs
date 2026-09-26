@@ -156,6 +156,71 @@ namespace Ronriku.Presentation.Arcade
         }
 
         public static float EaseOut(float t) => 1f - (1f - t) * (1f - t);
+
+        /// <summary>A small square that pops and fades: trails, sparks, hit dust.</summary>
+        public static void Spark(VisualElement layer, Vector2 at, Color color, float size = 10f, float seconds = 0.35f)
+        {
+            var dot = new VisualElement { pickingMode = PickingMode.Ignore };
+            dot.style.position = Position.Absolute;
+            dot.style.left = at.x - size * 0.5f;
+            dot.style.top = at.y - size * 0.5f;
+            dot.style.width = dot.style.height = size;
+            dot.style.backgroundColor = color;
+            layer.Add(dot);
+            Animate(dot, seconds, t =>
+            {
+                dot.style.opacity = 1f - t;
+                dot.style.scale = new Scale(Vector3.one * (1f - 0.6f * t));
+            }, dot.RemoveFromHierarchy);
+        }
+
+        /// <summary>Cards/tiles rise into place one after another.</summary>
+        public static void DealIn(VisualElement target, int order, float distance = 110f)
+        {
+            if (MotionSettings.ReducedMotion) return;
+            target.style.translate = new Translate(0, distance);
+            target.style.opacity = 0f;
+            target.schedule.Execute(() => Animate(target, 0.22f, t =>
+            {
+                float e = 1f - Mathf.Pow(1f - t, 3f);
+                target.style.translate = new Translate(0, distance * (1f - e));
+                target.style.opacity = t;
+            }, () => target.style.translate = new Translate(0, 0))).StartingIn(order * 45);
+        }
+    }
+
+    /// <summary>Red pulsing screen edges while the player is one hit from losing.</summary>
+    public sealed class DangerVignette : VisualElement
+    {
+        public DangerVignette()
+        {
+            pickingMode = PickingMode.Ignore;
+            style.position = Position.Absolute;
+            style.left = style.right = style.top = style.bottom = 0;
+            Color red = RonrikuTheme.WithAlpha(RonrikuTheme.Red, 0.55f), clear = RonrikuTheme.WithAlpha(RonrikuTheme.Red, 0f);
+            Add(Edge(true, PixelTextures.VerticalGradient(red, clear)));
+            Add(Edge(false, PixelTextures.VerticalGradient(clear, red)));
+            style.display = DisplayStyle.None;
+            schedule.Execute(() =>
+            {
+                if (resolvedStyle.display == DisplayStyle.None) return;
+                style.opacity = 0.55f + 0.45f * Mathf.Abs(Mathf.Sin(Time.realtimeSinceStartup * 3.2f));
+            }).Every(33);
+        }
+
+        private static VisualElement Edge(bool top, Texture2D texture)
+        {
+            var e = new VisualElement { pickingMode = PickingMode.Ignore };
+            e.style.position = Position.Absolute;
+            e.style.left = e.style.right = 0;
+            if (top) e.style.top = 0; else e.style.bottom = 0;
+            e.style.height = 90;
+            e.style.backgroundImage = new StyleBackground(texture);
+            e.style.backgroundSize = new BackgroundSize(Length.Percent(100), Length.Percent(100));
+            return e;
+        }
+
+        public void Set(bool on) => style.display = on ? DisplayStyle.Flex : DisplayStyle.None;
     }
 
     /// <summary>Pixel shapes drawn with Painter2D, shared by tokens, scales and boards.</summary>

@@ -41,8 +41,7 @@ namespace Ronriku.Presentation.Screens
             Add(time);
             Add(Caption($"{result.Solved} / {result.Trials} SOLVED   //   {result.Points} PTS", RonrikuTheme.Muted, 12, 22));
             if (result.ShardsEarned > 0) Add(Caption($"+{result.ShardsEarned} SHARDS", RonrikuTheme.Teal, 14, 24));
-            Add(Caption(localMode ? "LOCAL MODE   //   NO GLOBAL PERCENTILE YET" : "PERCENTILE PENDING",
-                RonrikuTheme.Muted, 10, 20));
+            if (localMode) Add(Caption("OFFLINE  //  CONNECT TO RANK", RonrikuTheme.Muted, 10, 20));
 
             Add(Rule());
 
@@ -75,7 +74,10 @@ namespace Ronriku.Presentation.Screens
                     $"{status}   {FormatTime(o.ElapsedMilliseconds)}", o.Solved ? RonrikuTheme.OffWhite : RonrikuTheme.Muted));
             }
 
-            if (result.Skills != null && result.Skills.Count > 0)
+            bool skillsDiffer = false;
+            if (result.Skills != null)
+                foreach (SkillChange c in result.Skills) if (c.Delta != result.Skills[0].Delta) skillsDiffer = true;
+            if (skillsDiffer)
             {
                 var skills = new VisualElement();
                 skills.style.flexDirection = FlexDirection.Row;
@@ -98,10 +100,23 @@ namespace Ronriku.Presentation.Screens
             spacer.style.flexGrow = 1;
             Add(spacer);
 
+            var buttons = UiFactory.Row();
+            var shareButton = UiFactory.FlatButton("SHARE", () =>
+            {
+                string text = Share.DailyText(result, dailyNumber, RonrikuTuning.Current.shareUrl);
+                if (!Share.Send(text)) Toast.Show(this, "COPIED  ·  PASTE IT ANYWHERE", RonrikuTheme.Teal);
+            });
+            shareButton.name = "share-button";
+            shareButton.style.width = 120;
+            shareButton.style.height = 52;
+            buttons.Add(shareButton);
             var homeButton = UiFactory.GlowButton("CONTINUE", () => { haptics.Selection(); home(); }, RonrikuTheme.Frost);
             homeButton.name = "home-button";
             homeButton.style.height = 52;
-            Add(homeButton);
+            homeButton.style.flexGrow = 1;
+            homeButton.style.marginLeft = 10;
+            buttons.Add(homeButton);
+            Add(buttons);
 
             _rating.text = result.RatingBefore.ToString();
             _startedAt = Time.realtimeSinceStartup;

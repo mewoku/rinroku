@@ -456,7 +456,8 @@ namespace Ronriku.Presentation.Arcade
         private readonly List<CharmId> _picked = new List<CharmId>();
         private bool _committed;
 
-        public CharmPickScreen(CharmId[] offer, int picks, Palette palette, string title, Action back, Action<CharmId[]> done)
+        public CharmPickScreen(CharmId[] offer, int picks, Palette palette, string title, Action back, Action<CharmId[]> done,
+            Figure monster = null, string stakes = null)
         {
             name = "charm-pick";
             style.flexGrow = 1;
@@ -519,6 +520,31 @@ namespace Ronriku.Presentation.Arcade
                 };
                 Add(card);
                 Juice.SlideIn(card, 420f + i * 80f, 0.3f + i * 0.06f);
+            }
+
+            if (monster != null)
+            {
+                Add(UiFactory.Spacer());
+                var foe = UiFactory.Row();
+                foe.style.justifyContent = Justify.Center;
+                foe.style.flexShrink = 0;
+                var view = new Voxels.VoxelView(monster, 72, 30f, false);
+                view.style.width = view.style.height = 110;
+                foe.Add(view);
+                var info = new VisualElement();
+                info.style.marginLeft = 12;
+                var foeName = UiFactory.Heading(monster.Name, 16, palette.Accent);
+                foeName.style.unityTextAlign = TextAnchor.MiddleLeft;
+                info.Add(foeName);
+                if (!string.IsNullOrEmpty(stakes))
+                {
+                    var stakesLabel = UiFactory.Heading(stakes, 12, RonrikuTheme.Text);
+                    stakesLabel.style.unityTextAlign = TextAnchor.MiddleLeft;
+                    stakesLabel.style.marginTop = 6;
+                    info.Add(stakesLabel);
+                }
+                foe.Add(info);
+                Add(foe);
             }
         }
     }

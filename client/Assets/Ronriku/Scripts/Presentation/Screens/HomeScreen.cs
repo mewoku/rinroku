@@ -74,7 +74,7 @@ namespace Ronriku.Presentation.Screens
 
             var note = UiFactory.Label(model.CompletedToday
                 ? "DONE TODAY  ·  REPLAYS ARE PRACTICE"
-                : $"+{model.RewardShards} SHARDS  ·  {(model.LocalMode ? "LOCAL MODE" : "RANKED")}", 10, RonrikuTheme.Muted);
+                : $"+{model.RewardShards} SHARDS  ·  {(model.LocalMode ? "OFFLINE" : "RANKED")}", 10, RonrikuTheme.Muted);
             note.style.marginTop = 10;
             Add(note);
 

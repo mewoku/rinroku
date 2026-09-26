@@ -131,11 +131,15 @@ namespace Ronriku.Domain.Player
             var profile = new PlayerProfile
             {
                 playerId = playerId,
-                displayName = "PLAYER " + playerId.Substring(0, Math.Min(4, playerId.Length)).ToUpperInvariant()
+                displayName = FriendlyName(playerId)
             };
             profile.Migrate();
             return profile;
         }
+
+        /// <summary>A figure-style name (e.g. "KEYOVI") derived from the player id, so nobody starts as "PLAYER 1A2B".</summary>
+        public static string FriendlyName(string playerId) =>
+            Figures.FigureGenerator.Generate(Hashing.Fnv1a(playerId ?? "ronriku"), 3, false).Name;
 
         /// <summary>Brings a deserialised profile to the current schema. Returns false if it cannot be used.</summary>
         public bool Migrate()

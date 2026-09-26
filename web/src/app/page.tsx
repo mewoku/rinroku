@@ -19,10 +19,10 @@ const TRIALS = [
 ] as const;
 
 const STEPS: { icon: IconName; title: string; body: string }[] = [
-  { icon: "bolt", title: "Daily three", body: "Pattern → Spatial → Link. One run a day, same puzzles for everyone. Rating and streak on the line." },
-  { icon: "play", title: "Adventure", body: "Five worlds — LAB, PRISM, EMBER, GROVE, FROST — twelve levels each, a boss on level 12. 5–10 minute sessions." },
+  { icon: "play", title: "Arcade adventure", body: "Five worlds, sixty levels: puzzle battles, Balatro-style rune hands, ice dashes and a rhythm dungeon. A two-phase boss ends every world." },
+  { icon: "bolt", title: "Daily three", body: "Pattern → Spatial → Link. Same puzzles for everyone, one run a day. Rating, streak and a share grid." },
   { icon: "shard", title: "Earn shards", body: `+${EARN.levelClear} per clear, +${EARN.dailyCompletion} per Daily, up to +${EARN.bossWinMax} per boss. Spend them on figures.` },
-  { icon: "cube", title: "Collect figures", body: "Procedural voxel people in 3×3, 4×4 and 5×5 tiers. Equip one as your avatar, trade, or mint to devnet." },
+  { icon: "cube", title: "Collect figures", body: "Procedural voxel people in 3×3, 4×4 and 5×5 tiers. Equip one as your avatar. Early access: collectibles live on Solana devnet." },
 ];
 
 export default function LandingPage() {
@@ -33,7 +33,7 @@ export default function LandingPage() {
       {/* ---------------- hero ---------------- */}
       <section className="mx-auto grid max-w-[1200px] items-center gap-8 px-4 pt-8 pb-12 md:grid-cols-[1.1fr_1fr] md:pt-16 md:pb-20">
         <div className="px-rise flex flex-col items-center text-center md:items-start md:text-left">
-          <p className="font-pixel text-[12px] leading-4 text-yellow uppercase">Daily pixel reasoning · Solana Seeker</p>
+          <p className="font-pixel text-[12px] leading-4 text-yellow uppercase">Puzzle combat · Solana Seeker</p>
           <h1
             className="mt-4 text-[44px] leading-[48px] text-teal min-[400px]:text-[56px] min-[400px]:leading-[56px] md:text-[96px] md:leading-[96px]"
             style={{
@@ -43,9 +43,9 @@ export default function LandingPage() {
             RONRIKU
           </h1>
           <p className="mt-6 max-w-[440px] text-[18px] leading-7 text-text">
-            Three puzzles a day. Voxel monsters to out-think. Tiny 3D people to collect.
+            Every card is a puzzle. Solve fast, stack combos, watch chips × mult flatten the monster.
           </p>
-          <p className="mt-2 max-w-[440px] text-[14px] leading-5 text-muted">No reflexes, no luck — just a calm, sharp mind. Median solve: under a minute.</p>
+          <p className="mt-2 max-w-[440px] text-[14px] leading-5 text-muted">Bite-size fights, a daily brain run, a funky chiptune soundtrack. Free, no wallet needed to start.</p>
           <div className="mt-8 flex w-full flex-col items-stretch gap-4 min-[400px]:w-auto min-[400px]:flex-row min-[400px]:items-center">
             <PixelButton href="/play" size="lg">
               <PixelIcon name="play" size={16} /> Play in browser
@@ -120,7 +120,7 @@ export default function LandingPage() {
             <p className="font-pixel text-[12px] text-accent-2 uppercase">Bosses · weekly raids</p>
             <h2 className="mt-2 text-[32px] leading-10 text-accent md:text-[40px] md:leading-[48px]">{boss.name}, the Warden</h2>
             <p className="mt-3 max-w-[520px] text-[16px] leading-6 text-text">
-              Three chained puzzles against the clock. Every solve chips its HP bar. Win up to {EARN.bossWinMax.toLocaleString("en-US")} shards and a spot on the boss board.
+              Weekly raids: three chained puzzles against the clock. Every solve chips its HP bar. Win up to {EARN.bossWinMax.toLocaleString("en-US")} shards and a spot on the boss board.
             </p>
             <div className="mt-4 max-w-[420px]" aria-hidden="true">
               <div className="flex justify-between font-pixel text-[10px] text-muted">
@@ -150,7 +150,7 @@ export default function LandingPage() {
             <p className="font-pixel text-[12px] text-accent uppercase">Solana Seeker</p>
             <h2 className="mt-1 text-[24px] leading-8 text-text md:text-[32px] md:leading-10">Built for the phone in your pocket.</h2>
             <p className="mt-2 max-w-[560px] text-[15px] leading-6 text-muted">
-              Native Android build with haptics, gyroscope parallax and Seed Vault wallet. Solana dApp Store listing is in preparation — play the same game in the browser today.
+              Native Android build with haptics, gyroscope parallax and 60 fps pixel combat, made for the Seeker. Coming to the Solana dApp Store — play the same game in the browser today.
             </p>
           </div>
           <div className="flex flex-wrap gap-4">
@@ -161,7 +161,7 @@ export default function LandingPage() {
           </div>
         </div>
         <footer className="mt-12 flex flex-wrap items-center justify-between gap-4 border-t-2 border-line pt-6 font-pixel text-[10px] text-muted">
-          <span>© RONRIKU · Solana devnet only · no real funds</span>
+          <span>© RONRIKU · Early access · collectibles on Solana devnet (test SOL, no real funds)</span>
           <span>Fonts: Silkscreen, Pixelify Sans (OFL)</span>
         </footer>
       </section>

@@ -69,7 +69,7 @@ namespace Ronriku.Presentation.Shell
         {
             TopBarModel m = _model();
             _name.text = m.Name;
-            _level.text = $"LV {m.Level}{(m.Online ? "" : "  ·  LOCAL")}";
+            _level.text = $"LV {m.Level}{(m.Online ? "" : "  ·  OFFLINE")}";
             _shards.text = m.Shards.ToString();
             _rating.text = m.Rating.ToString();
             if (m.AvatarKey == _avatarKey && _avatar != null) return;

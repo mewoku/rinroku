@@ -65,7 +65,7 @@ namespace Ronriku.Presentation.Screens
             marketTitle.style.unityTextAlign = TextAnchor.MiddleLeft;
             market.Add(marketTitle);
             var marketText = UiFactory.Paragraph(
-                "Trade figures with other players for shards or devnet SOL. Opens when you connect online.", 12, RonrikuTheme.Muted);
+                "Trade figures with other players for shards or test SOL. Early access: collectibles live on Solana devnet. Opens when you connect online.", 12, RonrikuTheme.Muted);
             marketText.style.marginTop = 6;
             market.Add(marketText);
             scroll.Add(market);
@@ -91,7 +91,7 @@ namespace Ronriku.Presentation.Screens
             bool owned = _profile.figures.Exists(f => f.id == item.Id);
             Button buy;
             if (owned) buy = UiFactory.FlatButton("OWNED", null);
-            else if (item.SolOnly) buy = UiFactory.GlowButton("SOL · ONLINE", () => Toast.Show(this, "LEGENDARY FIGURES ARE DEVNET NFTS. CONNECT ONLINE TO BUY.", rarity), RonrikuTheme.Boss);
+            else if (item.SolOnly) buy = UiFactory.GlowButton("TEST SOL", () => Toast.Show(this, "EARLY ACCESS: LEGENDARIES ARE SOLANA DEVNET NFTS (TEST SOL). BUY ON THE WEBSITE.", rarity), RonrikuTheme.Boss);
             else
             {
                 buy = UiFactory.GlowButton(string.Empty, () => Purchase(item, card), RonrikuTheme.Pattern);

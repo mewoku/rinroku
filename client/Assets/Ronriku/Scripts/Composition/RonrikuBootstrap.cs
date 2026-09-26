@@ -382,8 +382,10 @@ namespace Ronriku.Composition
                     _shell.ShowFullscreen(Battle(Adaptive.Apply(LevelModes.Battle(def), heat), hero, monster, palette, title, done), palette);
                     break;
                 case LevelMode.Cards:
+                    CardsConfig preview = Adaptive.Apply(LevelModes.Cards(def), heat);
                     _shell.ShowFullscreen(new CharmPickScreen(LevelModes.CharmOffer(def), 1, palette, title, BackToMap, charms =>
-                        _shell.ShowFullscreen(Cards(Adaptive.Apply(LevelModes.Cards(def, charms), heat), hero, monster, palette, title, done), palette)), palette);
+                        _shell.ShowFullscreen(Cards(Adaptive.Apply(LevelModes.Cards(def, charms), heat), hero, monster, palette, title, done), palette),
+                        monster, $"HP {preview.Target}  ·  {preview.Hands} HANDS  ·  {preview.Discards} DISCARDS"), palette);
                     break;
                 case LevelMode.Dash:
                     _shell.ShowFullscreen(new DashScreen(DashLevel.Generate(Ronriku.Domain.Daily.DailyPlan.Mix(def.Seed, 33), Adaptive.TierFor(LevelModes.Tier(world, index), heat)), hero, palette, title, BackToMap, done), palette);
@@ -402,6 +404,7 @@ namespace Ronriku.Composition
                             return;
                         }
                         Music.Stinger(MusicStinger.LevelUp);
+                        CardsConfig bossPreview = Adaptive.Apply(LevelModes.BossCards(def), heat);
                         _shell.ShowFullscreen(new CharmPickScreen(LevelModes.CharmOffer(def), 2, palette, title + "  ·  2/2", BackToMap, charms =>
                             _shell.ShowFullscreen(Cards(Adaptive.Apply(LevelModes.BossCards(def, charms), heat), hero, monster, palette, title + "  ·  2/2", second => done(new ArcadeResult
                             {
@@ -411,7 +414,7 @@ namespace Ronriku.Composition
                                 Score = first.Score + second.Score,
                                 BestCombo = first.BestCombo,
                                 Proof = first.Proof + "||" + second.Proof
-                            })), palette)), palette);
+                            })), palette), monster, $"HP {bossPreview.Target}  ·  {bossPreview.Hands} HANDS"), palette);
                     }), palette);
                     break;
             }

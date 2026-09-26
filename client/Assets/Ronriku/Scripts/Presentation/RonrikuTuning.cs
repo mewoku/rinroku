@@ -17,6 +17,10 @@ namespace Ronriku.Presentation
         [Tooltip("Multiplier for floating damage / score numbers.")]
         [Range(0.5f, 2f)] public float popupScale = 1f;
 
+        [Header("Sharing")]
+        [Tooltip("Link appended to shared Daily results (your website / store page). Empty = no link.")]
+        public string shareUrl = "";
+
         [Header("Audio")]
         [Tooltip("Sound-effect loudness (music has its own slider in the Me tab).")]
         [Range(0f, 1f)] public float sfxVolume = 1f;

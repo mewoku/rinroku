@@ -10,7 +10,7 @@ Facts below were checked on 2026-09-26 against the repo and the current `Builds/
 | B1 | Current APK is **debug-signed** (`CN=Android Debug`). dApp Store rejects it. | `store/make-keystore.ps1`, then build with the `RONRIKU_*` env vars (SOLANA_DAPP_STORE.md step 3). |
 | B2 | Backend is `http://127.0.0.1:54321` (adb reverse, dev only). For real users it silently stays offline, and it forces **cleartext HTTP on** in the manifest. | Pick one in §2 before building. |
 | B3 | Domain bought (`odlet.xyz`) but not live yet: `/privacy`, `/terms` and the website must be on public **HTTPS** for the listing. The local `deploy/.env` still has `DOMAIN=:80`, `SITE_URL=http://localhost:8080`. | Point odlet.xyz DNS at the VPS and run `deploy/up.sh` there (§2). |
-| B7 | Rename to ODLET: the APK must report package `com.odlet.game` (the current APK is still `com.ronriku.game`) and show the ODLET name/icon. The dApp Store keys the listing on the package, so rename **before** the first submission. | Unity engineer; verify with `aapt2 dump badging` (§3). |
+| B7 | ~~Rename to ODLET~~ — done: the APK is `ODLET.apk`, package `com.odlet.game`, verified installed on the Pixel 6a (2026-09-26). | — |
 | B4 | Publisher Portal account, **KYC/KYB**, and a mainnet wallet with ~0.25 SOL. | Owner only. |
 | B5 | Review takes **3–5 business days** → the app can be *submitted* this morning, not *live*. | — |
 | B6 | v3 has **not been played on a device** yet (STATE.md open item 1). | 15-minute device pass (§5) before submitting. |
